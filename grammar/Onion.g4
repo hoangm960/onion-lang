@@ -12,7 +12,9 @@ statement
     | classDef
     ;
 
-assignment: '(' 'let' IDENTIFIER expression ')';
+assignment
+    : '(' 'let' IDENTIFIER expression ')'
+    | '(' 'let' ( '(' IDENTIFIER expression ')' )+ ')';
 
 expression
     : literal
