@@ -1,0 +1,5 @@
+(class Counter
+  (
+    (def increment (x) ( (print (+ x 1)) ))
+  )
+)
