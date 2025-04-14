@@ -1,0 +1,13 @@
+// Function Tests
+(def add (x y)                     // Basic function
+    (+ x y))
+
+(def factorial (n)                   // Complex function
+    (let (result 1))
+    (let (i 1))
+    (while (< i n)
+        (let result (* result i))
+        (inc i))
+    (print result))
+
+(factorial 5)                        // Function call

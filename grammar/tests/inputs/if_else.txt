@@ -1,0 +1,19 @@
+// If-Elif-Else Tests
+(let (grade 85))
+(if (>= grade 90)
+    (print "A")
+    (elif (>= grade 80)
+        (print "B"))
+    (elif (>= grade 70)
+        (print "C"))
+    (else 
+        (print "F")))
+
+// Loop Tests
+(loop i range (0, 5, 1)             // For loop
+    (print i))
+
+(let (x 0))                         // While loop
+(while (< x 5)
+    (print x)
+    (inc x))
