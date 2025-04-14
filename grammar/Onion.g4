@@ -10,6 +10,7 @@ statement
     | printStatement
     | macroDef
     | classDef
+    | loopStatement
     ;
 
 assignment
@@ -51,6 +52,10 @@ ifExpr: '(' 'if' expression 'then' statement ('else' statement)? ')';
 functionCall: '(' IDENTIFIER expression (expression)* ')';
 
 printStatement: '(' 'print' expression ')';
+
+loopStatement 
+    : '(' 'for' '(' IDENTIFIER expression expression ')' statement ')'
+    ;
 
 macroDef: '(' 'macro' IDENTIFIER '(' (IDENTIFIER (',' IDENTIFIER)*)? ')' block ')';
 
