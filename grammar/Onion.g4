@@ -13,6 +13,7 @@ statement
     | loopStatement
     | incDecStmt
     | functionDef   
+    | returnStmt
     ;
 
 incDecStmt
@@ -71,6 +72,10 @@ functionDef
         '(' (IDENTIFIER (IDENTIFIER)*)? ')' 
         block 
     ')';
+
+returnStmt
+    :'(' 'return' (IDENTIFIER | literal)')'
+    | '(' 'return' '(' (IDENTIFIER | literal) (IDENTIFIER | literal)* ')')' //multiple return
 
 functionCall: '(' IDENTIFIER expression (expression)* ')';
 

@@ -1,4 +1,13 @@
-# For documentation (Later)
+# Onion
+## Objective
+- Document writing
+- Language features
+    - Variables (including arrays)
+    - Expressions
+    - Condition statements
+    - Loop statements
+    - Printing variable
+    - Error handling: Type mismatch (including if/for condition), divide-by-zero, index out of bound.
 ## Test grammar
 Input your test file in *tests/inputs/*
 ```cmd
