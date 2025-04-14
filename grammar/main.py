@@ -1,11 +1,39 @@
+import re
 import os
 from antlr4 import *
 from OnionLexer import OnionLexer
 from OnionParser import OnionParser
-import sys
 
 # Define the global variable for test file directory
-dir_name = "./tests"  # Set your test directory here (relative or absolute path)
+# Set your test directory here (relative or absolute path)
+TEST_DIR_INPUTS = "./tests/inputs"
+TEST_DIR_OUTPUTS = "./tests/outputs"
+
+
+def beautify_parse_tree(tree_str):
+    import re
+    tokens = re.findall(r'\(|\)|[^\s()]+', tree_str)
+
+    def parse(tokens, depth=0):
+        output = ""
+        while tokens:
+            token = tokens.pop(0)
+
+            if token == '(':
+                # Check for empty node and skip if found
+                if tokens and tokens[0] == ')':
+                    tokens.pop(0)
+                    continue
+                node = tokens.pop(0)
+                output += " " * depth + f"{node}:\n"
+                output += parse(tokens, depth + 1)
+            elif token == ')':
+                return output
+            else:
+                output += " " * depth + f"{token}{"" if tokens and tokens[0] == ")" else ":"}\n"
+        return output
+
+    return parse(tokens)
 
 def parse_input(input_text):
     lexer = OnionLexer(InputStream(input_text))
@@ -14,20 +42,23 @@ def parse_input(input_text):
 
     try:
         tree = parser.program()  # Replace with your actual entry rule
-        print(tree.toStringTree(recog=parser))
+        str_tree = beautify_parse_tree(tree.toStringTree(recog=parser))
+        return str_tree
     except Exception as e:
         print(f"Parse error: {e}")
 
+
 def run_test_file(filename):
     # Use the global dir_name to form the full path
-    test_file_path = os.path.join(dir_name, filename)
+    input_file_path = os.path.join(TEST_DIR_INPUTS, filename)
+    output_file_path = os.path.join(TEST_DIR_OUTPUTS, filename)
 
-    if not os.path.exists(test_file_path):
-        print(f"❌ File '{test_file_path}' not found.")
+    if not os.path.exists(input_file_path):
+        print(f"❌ File '{input_file_path}' not found.")
         return
 
-    print(f"📄 Running test cases from '{test_file_path}':")
-    with open(test_file_path, 'r') as f:
+    print(f"📄 Running test cases from '{input_file_path}':")
+    with open(input_file_path, 'r') as f:
         test_code = f.read()
 
     # Each test block is separated by blank lines
@@ -35,7 +66,13 @@ def run_test_file(filename):
     for i, case in enumerate(cases, start=1):
         print(f"\n[Test {i}]")
         print(f"Code:\n{case}")
-        parse_input(case)
+        print(f"Output:")
+
+        str_tree = parse_input(case)
+        with open(output_file_path, "w") as f:
+            f.write(str_tree)
+        print(str_tree)
+
 
 def repl():
     print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
@@ -44,12 +81,12 @@ def repl():
             line = input(">>> ").strip()
             if line.lower() in ('exit', 'quit'):
                 break
-            elif line.startswith("RUN_TEST"):
+            elif line.startswith("run"):
                 parts = line.split()
                 if len(parts) == 2:
                     run_test_file(parts[1])
                 else:
-                    print("Usage: RUN_TEST filename.txt")
+                    print("Usage: run filename.txt")
             elif line == "":
                 continue
             else:
@@ -59,6 +96,7 @@ def repl():
             break
         except Exception as e:
             print(f"Error: {e}")
+
 
 if __name__ == '__main__':
     repl()

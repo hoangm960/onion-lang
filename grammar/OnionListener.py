@@ -1,4 +1,4 @@
-# Generated from Onion.g4 by ANTLR 4.13.2
+# Generated from .//grammar//Onion.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .OnionParser import OnionParser
@@ -95,6 +95,15 @@ class OnionListener(ParseTreeListener):
 
     # Exit a parse tree produced by OnionParser#printStatement.
     def exitPrintStatement(self, ctx:OnionParser.PrintStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#loopStatement.
+    def enterLoopStatement(self, ctx:OnionParser.LoopStatementContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#loopStatement.
+    def exitLoopStatement(self, ctx:OnionParser.LoopStatementContext):
         pass
 
 
