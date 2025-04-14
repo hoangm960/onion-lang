@@ -72,21 +72,28 @@ def run_test_file(filename):
             f.write(str_tree)
         print(str_tree)
 
+def run_all_test_files():
+    filenames = next(os.walk(TEST_DIR_INPUTS), (None, None, []))[2]
+    for filename in filenames:
+        run_test_file(filename)
 
 def repl():
     print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
     while True:
         try:
             line = input(">>> ").strip()
-            if line.lower() in ('exit', 'quit'):
+            tokens = line.split()
+            command = tokens.pop()
+            if command.lower() in ('exit', 'quit'):
                 break
-            elif line.startswith("run"):
-                parts = line.split()
-                if len(parts) == 2:
-                    run_test_file(parts[1])
+            elif command == "run":
+                if tokens:
+                    run_test_file(tokens.pop())
                 else:
                     print("Usage: run filename.txt")
-            elif line == "":
+            elif command == "runall":
+                run_all_test_files()
+            elif command == "":
                 continue
             else:
                 parse_input(line)

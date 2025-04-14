@@ -1,0 +1,23 @@
+program:
+ statement:
+  expression
+ statement:
+  expression:
+  statement:
+   expression:
+    for
+  statement:
+   expression:
+    functionCall:
+     i:
+      expression:
+       literal:
+        0
+      expression:
+       literal:
+        10
+  statement:
+   printStatement:
+    print:
+     expression:
+      i
