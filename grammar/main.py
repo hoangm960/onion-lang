@@ -11,7 +11,6 @@ TEST_DIR_OUTPUTS = "./tests/outputs"
 
 
 def beautify_parse_tree(tree_str):
-    import re
     tokens = re.findall(r'\(|\)|[^\s()]+', tree_str)
 
     def parse(tokens, depth=0):
