@@ -1,0 +1,6 @@
+(print "Hello, World!")          // Print String
+(print 10)                       // Print INT
+(print 3.14)                     // Print FLOAT
+(print true)                     // Print BOOL
+(print (+ 5 3))                  // Print Arithmetic Expr Result
+(print (== 5 5))                 // Print Boolean Expr Result
