@@ -26,6 +26,15 @@ class OnionListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by OnionParser#incDecStmt.
+    def enterIncDecStmt(self, ctx:OnionParser.IncDecStmtContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#incDecStmt.
+    def exitIncDecStmt(self, ctx:OnionParser.IncDecStmtContext):
+        pass
+
+
     # Enter a parse tree produced by OnionParser#assignment.
     def enterAssignment(self, ctx:OnionParser.AssignmentContext):
         pass
@@ -62,12 +71,12 @@ class OnionListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by OnionParser#arrayExpr.
-    def enterArrayExpr(self, ctx:OnionParser.ArrayExprContext):
+    # Enter a parse tree produced by OnionParser#listExpr.
+    def enterListExpr(self, ctx:OnionParser.ListExprContext):
         pass
 
-    # Exit a parse tree produced by OnionParser#arrayExpr.
-    def exitArrayExpr(self, ctx:OnionParser.ArrayExprContext):
+    # Exit a parse tree produced by OnionParser#listExpr.
+    def exitListExpr(self, ctx:OnionParser.ListExprContext):
         pass
 
 
@@ -77,6 +86,24 @@ class OnionListener(ParseTreeListener):
 
     # Exit a parse tree produced by OnionParser#ifExpr.
     def exitIfExpr(self, ctx:OnionParser.IfExprContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#branchExpr.
+    def enterBranchExpr(self, ctx:OnionParser.BranchExprContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#branchExpr.
+    def exitBranchExpr(self, ctx:OnionParser.BranchExprContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#functionDef.
+    def enterFunctionDef(self, ctx:OnionParser.FunctionDefContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#functionDef.
+    def exitFunctionDef(self, ctx:OnionParser.FunctionDefContext):
         pass
 
 
@@ -95,6 +122,15 @@ class OnionListener(ParseTreeListener):
 
     # Exit a parse tree produced by OnionParser#printStatement.
     def exitPrintStatement(self, ctx:OnionParser.PrintStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#loopStatement.
+    def enterLoopStatement(self, ctx:OnionParser.LoopStatementContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#loopStatement.
+    def exitLoopStatement(self, ctx:OnionParser.LoopStatementContext):
         pass
 
 
