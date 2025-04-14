@@ -1,5 +1,3 @@
-(class Counter
-  (
-    (def increment (x) ( (print (+ x 1)) ))
-  )
+(class Person(name, age, sex)
+  ()
 )
