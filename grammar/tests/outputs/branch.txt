@@ -1,0 +1,25 @@
+program:
+ statement:
+  expression:
+   ifExpr:
+    if:
+     <missing:
+     ':
+     '>:
+      expression:
+       true
+      <missing:
+      '
+     '>:
+     statement:
+      expression:
+       then
+     <missing:
+     '
+    '>
+ statement:
+  printStatement:
+   print:
+    expression:
+     literal:
+      "yes"
