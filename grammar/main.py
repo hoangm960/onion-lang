@@ -30,7 +30,7 @@ def beautify_parse_tree(tree_str):
             elif token == ')':
                 return output
             else:
-                output += " " * depth + f"{token}{"" if tokens and tokens[0] == ")" else ":"}\n"
+                output += " " * depth + f"{token}{'' if tokens and tokens[0] == ')' else ':'}\n"
         return output
 
     return parse(tokens)

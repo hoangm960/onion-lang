@@ -1,1 +1,24 @@
-(program (statement (classDef ( class Counter (classBody ( (methodDef ( def increment ( x ) (block ( (statement (printStatement ( print (expression (arithmeticExpr ( + (expression x) (expression (literal 1)) ))) ))) )) )) )) ))))
+program:
+ statement:
+  classDef:
+   class:
+    Counter:
+    classBody:
+     (:
+      methodDef:
+      def:
+       increment:
+       x:
+       block:
+        (:
+         statement:
+         printStatement:
+          print:
+           expression:
+            arithmeticExpr:
+             +:
+              expression:
+               x
+              expression:
+               literal:
+                1
