@@ -9,11 +9,3 @@
     (else 
         (print "F")))
 
-// Loop Tests
-(loop i range (0, 5, 1)             // For loop
-    (print i))
-
-(let (x 0))                         // While loop
-(while (< x 5)
-    (print x)
-    (inc x))
