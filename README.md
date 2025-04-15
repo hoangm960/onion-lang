@@ -27,5 +27,5 @@ Outputs of the test cases will be displays at the terminal and saved to *tests/o
 ### Fix grammar
 The grammar file located at: *grammar/Onion.g4*. After fixing, run:
 ```cmd
-antlr4 -Dlanguage=Python3 Onion.g4
+antlr4 -Dlanguage=Python3 Onion.g4 -visitor -o onion_parser
 ```
