@@ -40,7 +40,6 @@ onion-lang/
 ### Test grammar
 Input your test file in *tests/inputs/*
 ```cmd
-cd grammar
 python main.py
 ```
 To test 1 test file:
