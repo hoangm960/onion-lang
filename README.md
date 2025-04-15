@@ -38,7 +38,7 @@ onion-lang/
 ```
 ## Grammar
 ### Test grammar
-Input your test file in *tests/inputs/*
+Input your test file in *tests/parsers/inputs/*
 ```bash
 python test_parser.py
 ```
@@ -50,7 +50,7 @@ To test all test files:
 ```bash
 >>> runall
 ```
-Outputs of the test cases will be displays at the terminal and saved to *tests/outputs/* 
+Outputs of the test cases will be displays at the terminal and saved to *tests/parsers/outputs/* 
 ### Fix grammar
 The grammar file located at: *grammar/Onion.g4*. After fixing, run:
 ```bash
