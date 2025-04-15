@@ -54,5 +54,5 @@ Outputs of the test cases will be displays at the terminal and saved to *tests/p
 ### Fix grammar
 The grammar file located at: *grammar/Onion.g4*. After fixing, run:
 ```bash
-antlr4 -Dlanguage=Python3 Onion.g4 -visitor -o onion_parser
+antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
 ```
