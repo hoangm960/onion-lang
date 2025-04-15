@@ -2,27 +2,63 @@ program:
  statement:
   assignment:
    let:
-    x:
+    grade:
      expression:
       literal:
-       0
+       85
  statement:
-  loopStatement:
-   while:
-    (:
+  expression:
+   ifExpr:
+    if:
      expression:
-     <:
-     x
-    5
-   statement:
-    printStatement:
-     print:
+      booleanExpr:
+       >=:
+        expression:
+         grade
+        expression:
+         literal:
+          90
+     statement:
+      printStatement:
+       print:
+        expression:
+         literal:
+          "A"
+     elif:
       expression:
-       x
-   <missing:
-   '
-  '>
-statement:
- incDecStmt:
-  inc:
-   x
+       booleanExpr:
+        >=:
+         expression:
+          grade
+         expression:
+          literal:
+           80
+      statement:
+       printStatement:
+        print:
+         expression:
+          literal:
+           "B"
+     elif:
+      expression:
+       booleanExpr:
+        >=:
+         expression:
+          grade
+         expression:
+          literal:
+           70
+      statement:
+       printStatement:
+        print:
+         expression:
+          literal:
+           "C"
+     else:
+      statement:
+       printStatement:
+        print:
+         expression:
+          literal:
+           "F"
+ <EOF>

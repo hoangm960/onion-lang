@@ -1,8 +1,10 @@
+// --- START OF FILE Onion.g4 ---
+
 grammar Onion;
 
 // Top-level rules
 
-program: statement+ ;
+program: statement+ EOF; // Added EOF for completeness
 
 statement
     : assignment
@@ -12,7 +14,9 @@ statement
     | classDef
     | loopStatement
     | incDecStmt
-    | functionDef   
+    | functionDef
+    | returnStmt
+    | block
     ;
 
 incDecStmt
@@ -22,7 +26,8 @@ incDecStmt
 
 assignment
     : '(' 'let' IDENTIFIER expression ')'
-    | '(' 'let' ( '(' IDENTIFIER expression ')' )+ ')';
+    | '(' 'let' ( '(' IDENTIFIER expression ')' )+ ')'
+    ;
 
 expression
     : literal
@@ -32,6 +37,7 @@ expression
     | listExpr
     | functionCall
     | ifExpr
+    | branchExpr // Added branchExpr here as it seems intended to be an expression form
     | macroCall
     ;
 
@@ -41,7 +47,6 @@ arithmeticExpr
     | '(' '*' expression+ ')'
     | '(' '/' expression expression+ ')'   // at least 2
     ;
-
 
 booleanExpr
     : '(' '==' expression expression ')'
@@ -53,67 +58,75 @@ booleanExpr
     | '(' 'not' expression ')'
     ;
 
-listExpr: '(' 'list' expression (expression)* ')'; //example: (list 1 "abc" Person) 
+listExpr: '(' 'list' expression* ')'; // Changed to * to allow empty lists (list)
 
 ifExpr
-    : '(' 'if' '(' expression ')' statement ')'
-      ('(' 'elif' '(' expression ')' statement)*
-      ('(' 'else' statement ')')? 
-    ')';
+    : '(' 'if' expression statement                      
+      ( '(' 'elif' expression statement ')' )*           
+      ( '(' 'else' statement ')' )?                     
+    ')'                                                 
+    ;
+
 branchExpr
-    : '(' 'cond' 
-        ('(' expression statement ')')+
-        ('(' 't' statement ')')?
+    : '(' 'cond'
+        ( '(' expression statement ')' )+
+        ( '(' 't' statement ')' )? // 't' often means true/otherwise in cond
     ')';
 
 functionDef
-    : '(' 'def' IDENTIFIER 
-        '(' (IDENTIFIER (IDENTIFIER)*)? ')' 
-        block 
+    : '(' 'def' IDENTIFIER
+        '(' IDENTIFIER* ')' // Simplified parameter list - allows zero params
+        block
     ')';
 
-functionCall: '(' IDENTIFIER expression (expression)* ')';
+returnStmt
+    : '(' 'return' (IDENTIFIER | literal) ')' // Single return value
+    | '(' 'return' '(' (IDENTIFIER | literal)+ ')' ')'; // Multiple return values - added closing paren and +
+
+functionCall: '(' IDENTIFIER expression* ')'; // Simplified argument list - allows zero args
 
 printStatement: '(' 'print' expression ')';
 
-loopStatement 
-    : '(' 'repeat' expression statement ')'                                           // (repeat 5 statement)
-    | '(' 'loop' IDENTIFIER 'range' '(' expression ',' expression (',' expression)? ')' statement ')'  // (for i in range(0, 10, 2) statement)
-    | '(' 'while' '(' expression ')' statement ')'                                   // (while (< x 10) statement)
+loopStatement
+    : '(' 'repeat' expression statement ')'                                           
+    | '(' 'loop' IDENTIFIER 'range' '(' expression expression (expression)? ')' statement+ ')'  
+    | '(' 'while' expression statement+  ')'                               
     ;
 
-macroDef: '(' 'macro' IDENTIFIER '(' (IDENTIFIER (',' IDENTIFIER)*)? ')' block ')';
+// Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
+macroDef: '(' 'macro' IDENTIFIER '(' IDENTIFIER* ')' block ')'; // Simplified params
 
-macroCall: '(' IDENTIFIER expression (expression)* ')';
+macroCall: '(' IDENTIFIER expression* ')'; // Simplified args
 
 classDef: '(' 'class' IDENTIFIER classBody ')';
 
 classBody
-    : '(' methodDef+ ')'
+    : '(' methodDef+ ')' // Assuming at least one method needed?
     ;
 
-methodDef: '(' 'def' IDENTIFIER '(' (IDENTIFIER (',' IDENTIFIER)*)? ')' block ')';
+methodDef: '(' 'def' IDENTIFIER '(' IDENTIFIER* ')' block ')'; // Simplified params
 
 block: '(' statement+ ')';
 
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
-
 literal
     : INT
-    |FLOAT
-    | BOOL
+    | FLOAT
+    | BOOL      
     | STRING
     ;
 
-INT: [0-9]+;
-FLOAT: [0-9]* '.' [0-9]+;
-BOOL: 'true' | 'false';
-STRING: '"' (~["\r\n])* '"';
+// Keywords as Tokens (matched before IDENTIFIER)
+BOOL:       'true' | 'false';
+
+// Literals
+INT:        [0-9]+;
+FLOAT:      [0-9]* '.' [0-9]+;
+STRING:     '"' (~["\r\n])*? '"' ; // *** Corrected: Added semicolon ***
+
+// Identifier (comes AFTER specific keywords like BOOL)
+IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 
 // Skip whitespace and comments
-
-WS: [ \t\r\n]+ -> skip;
-
-COMMENT: '/*' .*? '*/' -> skip;
-
+WS:         [ \t\r\n]+ -> skip;
+COMMENT:    '/*' .*? '*/' -> skip; // Non-greedy match
 LINE_COMMENT: '//' ~[\r\n]* -> skip;

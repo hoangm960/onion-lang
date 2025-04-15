@@ -96,7 +96,9 @@ def repl():
             elif command == "":
                 continue
             else:
-                parse_input(line)
+                result = parse_input(line)
+                if result:  
+                    print(result)
         except KeyboardInterrupt:
             print("\nBye!")
             break

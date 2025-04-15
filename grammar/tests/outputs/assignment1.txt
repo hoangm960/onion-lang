@@ -37,3 +37,4 @@ program:
        expression:
         literal:
          3
+ <EOF>

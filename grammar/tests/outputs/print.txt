@@ -1,0 +1,9 @@
+program:
+ statement:
+  assignment:
+   let:
+    a:
+    expression:
+     literal:
+      true
+ <EOF>
