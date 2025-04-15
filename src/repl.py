@@ -1,50 +1,10 @@
-import re
 import os
-from antlr4 import *
-from onion_parser.OnionLexer import OnionLexer
-from onion_parser.OnionParser import OnionParser
-
-# Define the global variable for test file directory
-# Set your test directory here (relative or absolute path)
-TEST_DIR_INPUTS = "./tests/inputs"
-TEST_DIR_OUTPUTS = "./tests/outputs"
+from src.parser import parse_input
+from src.utils import beautify_parse_tree
 
 
-def beautify_parse_tree(tree_str):
-    tokens = re.findall(r'\(|\)|[^\s()]+', tree_str)
-
-    def parse(tokens, depth=0):
-        output = ""
-        while tokens:
-            token = tokens.pop(0)
-
-            if token == '(':
-                # Check for empty node and skip if found
-                if tokens and tokens[0] == ')':
-                    tokens.pop(0)
-                    continue
-                node = tokens.pop(0)
-                output += " " * depth + f"{node}:\n"
-                output += parse(tokens, depth + 1)
-            elif token == ')':
-                return output
-            else:
-                output += " " * depth + f"{token}{'' if tokens and tokens[0] == ')' else ':'}\n"
-        return output
-
-    return parse(tokens)
-
-def parse_input(input_text):
-    lexer = OnionLexer(InputStream(input_text))
-    tokens = CommonTokenStream(lexer)
-    parser = OnionParser(tokens)
-
-    try:
-        tree = parser.program()
-        str_tree = beautify_parse_tree(tree.toStringTree(recog=parser))
-        return str_tree
-    except Exception as e:
-        print(f"Parse error: {e}")
+TEST_DIR_INPUTS = "./examples"
+TEST_DIR_OUTPUTS = "./tests/output/parsers"
 
 
 def run_test_file(filename):
@@ -67,17 +27,20 @@ def run_test_file(filename):
         print(f"Code:\n{case}")
         print(f"Output:")
 
-        str_tree = parse_input(case)
+        tree = parse_input(case)
+        beautify_tree = beautify_parse_tree(tree)
         with open(output_file_path, "w") as f:
-            f.write(str_tree)
-        print(str_tree)
+            f.write(beautify_tree)
+        print(beautify_tree)
+
 
 def run_all_test_files():
     filenames = next(os.walk(TEST_DIR_INPUTS), (None, None, []))[2]
     for filename in filenames:
         run_test_file(filename)
 
-def repl():
+
+def main():
     print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
     while True:
         try:
@@ -105,6 +68,5 @@ def repl():
         except Exception as e:
             print(f"Error: {e}")
 
-
 if __name__ == '__main__':
-    repl()
+    main()

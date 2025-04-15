@@ -1,5 +1,5 @@
-grammar/.antlr
+.antlr/
 __pycache__/
 */__pycache__/
 .venv/
-grammar\tests\outputs
+tests/output/
