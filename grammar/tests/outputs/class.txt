@@ -2,23 +2,20 @@ program:
  statement:
   classDef:
    class:
-    Counter:
+    Person:
     classBody:
-     (:
-      methodDef:
-      def:
-       increment:
-       x:
-       block:
-        (:
-         statement:
-         printStatement:
-          print:
-           expression:
-            arithmeticExpr:
-             +:
-              expression:
-               x
-              expression:
-               literal:
-                1
+     <missing:
+     '
+    '>
+  statement:
+   expression:
+    name
+  statement:
+   expression:
+    age
+  statement:
+   expression:
+    sex
+ statement:
+ statement:
+<EOF>

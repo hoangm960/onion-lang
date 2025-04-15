@@ -12,3 +12,4 @@ program:
      expression:
       literal:
        30
+ <EOF>

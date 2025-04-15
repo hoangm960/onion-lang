@@ -15,8 +15,13 @@ Input your test file in *tests/inputs/*
 cd grammar
 python main.py
 ```
+To test 1 test file:
 ```
 >>> run [filename].txt
+```
+To test all test files:
+```
+>>> runall
 ```
 Outputs of the test cases will be displays at the terminal and saved to *tests/outputs/* 
 ### Fix grammar

@@ -6,3 +6,4 @@ program:
      expression:
       literal:
        5
+ <EOF>

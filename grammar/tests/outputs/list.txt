@@ -6,7 +6,6 @@ program:
     expression:
      listExpr:
       list:
-       expression
  statement:
   assignment:
    let:
@@ -43,9 +42,11 @@ program:
         literal:
          "hello"
        expression:
-        true
+        literal:
+         true
  statement:
   printStatement:
    print:
     expression:
      numList
+ <EOF>

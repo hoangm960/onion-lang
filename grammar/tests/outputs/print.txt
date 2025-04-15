@@ -6,4 +6,9 @@ program:
     expression:
      literal:
       true
+ statement:
+  printStatement:
+   print:
+    expression:
+     a
  <EOF>

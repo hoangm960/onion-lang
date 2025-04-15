@@ -3,23 +3,23 @@ program:
   expression:
    ifExpr:
     if:
-     <missing:
-     ':
-     '>:
-      expression:
+     expression:
+      literal:
        true
-      <missing:
-      '
-     '>:
      statement:
       expression:
        then
-     <missing:
-     '
-    '>
- statement:
-  printStatement:
-   print:
-    expression:
-     literal:
-      "yes"
+  statement:
+   printStatement:
+    print:
+     expression:
+      literal:
+       "yes"
+  else:
+  statement:
+   printStatement:
+    print:
+     expression:
+      literal:
+       "no"
+ <EOF>

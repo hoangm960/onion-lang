@@ -71,3 +71,4 @@ program:
   incDecStmt:
    dec:
     y
+ <EOF>
