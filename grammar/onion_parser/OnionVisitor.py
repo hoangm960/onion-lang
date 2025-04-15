@@ -1,4 +1,4 @@
-# Generated from .//grammar//Onion.g4 by ANTLR 4.13.2
+# Generated from Onion.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .OnionParser import OnionParser
@@ -16,6 +16,11 @@ class OnionVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by OnionParser#statement.
     def visitStatement(self, ctx:OnionParser.StatementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#incDecStmt.
+    def visitIncDecStmt(self, ctx:OnionParser.IncDecStmtContext):
         return self.visitChildren(ctx)
 
 
@@ -39,13 +44,28 @@ class OnionVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by OnionParser#arrayExpr.
-    def visitArrayExpr(self, ctx:OnionParser.ArrayExprContext):
+    # Visit a parse tree produced by OnionParser#listExpr.
+    def visitListExpr(self, ctx:OnionParser.ListExprContext):
         return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by OnionParser#ifExpr.
     def visitIfExpr(self, ctx:OnionParser.IfExprContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#branchExpr.
+    def visitBranchExpr(self, ctx:OnionParser.BranchExprContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#functionDef.
+    def visitFunctionDef(self, ctx:OnionParser.FunctionDefContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#returnStmt.
+    def visitReturnStmt(self, ctx:OnionParser.ReturnStmtContext):
         return self.visitChildren(ctx)
 
 

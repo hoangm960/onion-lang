@@ -1,8 +1,8 @@
 import re
 import os
 from antlr4 import *
-from OnionLexer import OnionLexer
-from OnionParser import OnionParser
+from onion_parser.OnionLexer import OnionLexer
+from onion_parser.OnionParser import OnionParser
 
 # Define the global variable for test file directory
 # Set your test directory here (relative or absolute path)
@@ -40,7 +40,7 @@ def parse_input(input_text):
     parser = OnionParser(tokens)
 
     try:
-        tree = parser.program()  # Replace with your actual entry rule
+        tree = parser.program()
         str_tree = beautify_parse_tree(tree.toStringTree(recog=parser))
         return str_tree
     except Exception as e:
@@ -97,7 +97,7 @@ def repl():
                 continue
             else:
                 result = parse_input(line)
-                if result:  
+                if result:
                     print(result)
         except KeyboardInterrupt:
             print("\nBye!")

@@ -284,6 +284,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitProgram" ):
                 listener.exitProgram(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitProgram" ):
+                return visitor.visitProgram(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -374,6 +380,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitStatement" ):
                 listener.exitStatement(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitStatement" ):
+                return visitor.visitStatement(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -477,6 +489,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitIncDecStmt" ):
                 listener.exitIncDecStmt(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitIncDecStmt" ):
+                return visitor.visitIncDecStmt(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -552,6 +570,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitAssignment" ):
                 listener.exitAssignment(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitAssignment" ):
+                return visitor.visitAssignment(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -670,6 +694,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitExpression" ):
                 listener.exitExpression(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitExpression" ):
+                return visitor.visitExpression(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -769,6 +799,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitArithmeticExpr" ):
                 listener.exitArithmeticExpr(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitArithmeticExpr" ):
+                return visitor.visitArithmeticExpr(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -908,6 +944,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitBooleanExpr" ):
                 listener.exitBooleanExpr(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitBooleanExpr" ):
+                return visitor.visitBooleanExpr(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1051,6 +1093,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitListExpr" ):
                 listener.exitListExpr(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitListExpr" ):
+                return visitor.visitListExpr(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1117,6 +1165,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitIfExpr" ):
                 listener.exitIfExpr(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitIfExpr" ):
+                return visitor.visitIfExpr(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1212,6 +1266,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitBranchExpr" ):
                 listener.exitBranchExpr(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitBranchExpr" ):
+                return visitor.visitBranchExpr(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1299,6 +1359,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitFunctionDef" ):
                 listener.exitFunctionDef(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitFunctionDef" ):
+                return visitor.visitFunctionDef(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1372,6 +1438,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitReturnStmt" ):
                 listener.exitReturnStmt(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitReturnStmt" ):
+                return visitor.visitReturnStmt(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1485,6 +1557,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitFunctionCall" ):
                 listener.exitFunctionCall(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitFunctionCall" ):
+                return visitor.visitFunctionCall(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1541,6 +1619,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitPrintStatement" ):
                 listener.exitPrintStatement(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitPrintStatement" ):
+                return visitor.visitPrintStatement(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1602,6 +1686,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitLoopStatement" ):
                 listener.exitLoopStatement(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitLoopStatement" ):
+                return visitor.visitLoopStatement(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1733,6 +1823,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitMacroDef" ):
                 listener.exitMacroDef(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitMacroDef" ):
+                return visitor.visitMacroDef(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1804,6 +1900,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitMacroCall" ):
                 listener.exitMacroCall(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitMacroCall" ):
+                return visitor.visitMacroCall(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1864,6 +1966,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitClassDef" ):
                 listener.exitClassDef(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitClassDef" ):
+                return visitor.visitClassDef(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1916,6 +2024,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitClassBody" ):
                 listener.exitClassBody(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitClassBody" ):
+                return visitor.visitClassBody(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1979,6 +2093,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitMethodDef" ):
                 listener.exitMethodDef(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitMethodDef" ):
+                return visitor.visitMethodDef(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2048,6 +2168,12 @@ class OnionParser ( Parser ):
             if hasattr( listener, "exitBlock" ):
                 listener.exitBlock(self)
 
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitBlock" ):
+                return visitor.visitBlock(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2112,6 +2238,12 @@ class OnionParser ( Parser ):
         def exitRule(self, listener:ParseTreeListener):
             if hasattr( listener, "exitLiteral" ):
                 listener.exitLiteral(self)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitLiteral" ):
+                return visitor.visitLiteral(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
