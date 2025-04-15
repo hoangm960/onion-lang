@@ -41,6 +41,25 @@ def run_all_test_files():
         run_test_file(filename)
 
 if __name__ == "__main__":
-    # test_file = ""
-    # run_test_file(test_file)
-    run_all_test_files()
+    while True:
+        try:
+            user_input = input(">>> ")
+            tokens = user_input.strip().split()
+            command = tokens.pop()
+            if command in ["quit", "exit"]:
+                break
+            if command == "run":
+                if tokens:
+                    test_file = tokens.pop()
+                    run_test_file(test_file)
+                else:
+                    print("Usage: run [filename].txt")
+            elif command == "runall":
+                run_all_test_files()
+            else:
+                print(f"Command '{command}' is not recognized!")
+        except KeyboardInterrupt:
+            print("\nBye!")
+            break
+        except Exception as e:
+            print(f"Error: {e}")

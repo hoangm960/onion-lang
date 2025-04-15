@@ -40,7 +40,7 @@ onion-lang/
 ### Test grammar
 Input your test file in *tests/inputs/*
 ```bash
-python main.py
+python test_parser.py
 ```
 To test 1 test file:
 ```bash
