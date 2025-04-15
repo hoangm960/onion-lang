@@ -8,6 +8,34 @@
     - Loop statements
     - Printing variable
     - Error handling: Type mismatch (including if/for condition), divide-by-zero, index out of bound.
+## Folder Structure
+```
+onion-lang/
+├── README.md              
+├── requirements.txt             
+├── grammar/               
+│   └── Onion.g4         
+├── generated/             
+│   ├── __init__.py
+│   ├── ...
+│   ├── OnionLexer.py
+│   ├── OnionParser.py
+│   └── OnionVisitor.py   
+├── src/                   
+│   ├── __init__.py
+│   ├── parser.py    
+│   ├── interpreter.py     
+│   ├── repl.py            
+│   └── utils.py
+└── tests/
+    └── parsers/          
+        ├── input/
+        │   ├── input1.onion      
+        │   └── input2.onion     
+        └── output/
+            ├── output1.onion      
+            └── output2.onion      
+```
 ## Grammar
 ### Test grammar
 Input your test file in *tests/inputs/*
