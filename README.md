@@ -16,7 +16,7 @@ cd grammar
 python main.py
 ```
 ```
->> run [filename].txt
+>>> run [filename].txt
 ```
 Outputs of the test cases will be displays at the terminal and saved to *tests/outputs/* 
 ### Fix grammar
