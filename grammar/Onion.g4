@@ -21,7 +21,7 @@ statementType
     | functionDef
     | returnStmt
     | block
-    | functionCall // Allow function calls as standalone statements
+    | functionCall 
     ;
 
 incDecStmt
