@@ -74,7 +74,7 @@ def run_onion_file(filename, interpreter, save_output=False):
                     break
             
             if result is not None and not has_main_call:
-                print(f"Result: {result}")
+                print(f"{result}")
                 
             # Không in thông báo hoàn thành việc thực thi
             return result

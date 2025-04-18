@@ -235,71 +235,87 @@ class Interpreter(OnionVisitor):
     #     return result
 
 
+    def visitExpression(self, ctx):
+        # Check các loại cụ thể của expression
+        if ctx.literal():
+            result = self.visit(ctx.literal())
+            return result
+        elif ctx.IDENTIFIER():
+            var_name = ctx.IDENTIFIER().getText()
+            try:
+                result = self.env.resolve(var_name)
+                return result
+            except NameError as e:
+                return e
+        elif ctx.compoundExpr():
+            # Xử lý biểu thức lồng nhau trong ngoặc đơn: '(' compoundExpr ')'
+            return self.visit(ctx.compoundExpr())
+        return None
+
+    def visitCompoundExpr(self, ctx):
+        # Check các loại cụ thể của compoundExpr
+        if ctx.arithmeticExpr():
+            return self.visit(ctx.arithmeticExpr())
+        elif ctx.booleanExpr():
+            return self.visit(ctx.booleanExpr())
+        elif ctx.listExpr():
+            return self.visit(ctx.listExpr())
+        elif ctx.functionCall():
+            return self.visit(ctx.functionCall())
+        elif ctx.ifExpr():
+            return self.visit(ctx.ifExpr())
+        elif ctx.branchExpr():
+            return self.visit(ctx.branchExpr())
+        elif ctx.macroCall():
+            return self.visit(ctx.macroCall())
+        elif ctx.listOpExpr():
+            return self.visit(ctx.listOpExpr())
+        return None
+
     def visitArithmeticExpr(self, ctx):
         op = ctx.getChild(0).getText()
         
         if op == '+':
-            # Addition: Sum all child expressions.
+            # Addition: Sum all child expressions
             result = 0
-            for i in range(1, ctx.getChildCount()):  # Skip '+'
+            for i in range(1, ctx.getChildCount()):
                 child = ctx.getChild(i)
-                child_value = self.visit(child)
-                if child_value is None:
+                value = self.visit(child)
+                if value is None:
                     raise ValueError(f"Cannot evaluate expression at position {i}")
-                result += child_value
+                result += value
             return result
         elif op == '-':
             # Subtraction: only 2 operands
-            if ctx.getChildCount() != 3:  # '-', expr1, expr2
+            if ctx.getChildCount() != 3:
                 raise SyntaxError("Subtraction requires exactly 2 operands")
-            
-            # Get first operand
-            first_operand = ctx.getChild(1)
-            first_value = self.visit(first_operand)
-            if first_value is None:
-                raise ValueError("First operand of subtraction cannot be evaluated")
-            
-            # Get second operand
-            second_operand = ctx.getChild(2)
-            second_value = self.visit(second_operand)
-            if second_value is None:
-                raise ValueError("Second operand of subtraction cannot be evaluated")
-            
-            return first_value - second_value
+            left = self.visit(ctx.getChild(1))
+            right = self.visit(ctx.getChild(2))
+            if left is None or right is None:
+                raise ValueError("Cannot evaluate subtraction operands")
+            return left - right
         elif op == '*':
-            # Multiplication: multiply all child expressions.
+            # Multiplication: multiply all child expressions
             result = 1
-            for i in range(1, ctx.getChildCount()):  # Skip '*'
+            for i in range(1, ctx.getChildCount()):
                 child = ctx.getChild(i)
-                child_value = self.visit(child)
-                if child_value is None:
+                value = self.visit(child)
+                if value is None:
                     raise ValueError(f"Cannot evaluate expression at position {i}")
-                result *= child_value
+                result *= value
             return result
         elif op == '/':
             # Division: only 2 operands
-            if ctx.getChildCount() != 3:  # '/', expr1, expr2
+            if ctx.getChildCount() != 3:
                 raise SyntaxError("Division requires exactly 2 operands")
-            
-            # Get first operand
-            first_operand = ctx.getChild(1)
-            numerator = self.visit(first_operand)
-            if numerator is None:
-                raise ValueError("First operand of division cannot be evaluated")
-            
-            # Get second operand
-            second_operand = ctx.getChild(2)
-            denominator = self.visit(second_operand)
-            if denominator is None:
-                raise ValueError("Second operand of division cannot be evaluated")
-            
-            if denominator == 0:
+            left = self.visit(ctx.getChild(1))
+            right = self.visit(ctx.getChild(2))
+            if left is None or right is None:
+                raise ValueError("Cannot evaluate division operands")
+            if right == 0:
                 raise ZeroDivisionError("Division by zero")
-            
-            result = numerator / denominator
-            return result
-        else:
-            return None
+            return left / right
+        return None
         
     def visitListExpr(self, ctx):
         # First child is 'list' keyword, skip it
@@ -330,166 +346,71 @@ class Interpreter(OnionVisitor):
             return token == 'true'
         return None
 
-    def visitExpression(self, ctx):
-        # Check các loại cụ thể của expression
-        if ctx.literal():
-            result = self.visit(ctx.literal())
-            return result
-        elif ctx.arithmeticExpr():
-            result = self.visit(ctx.arithmeticExpr())
-            return result
-        elif ctx.booleanExpr():
-            result = self.visit(ctx.booleanExpr())
-            return result
-        elif ctx.listExpr():
-            result = self.visit(ctx.listExpr())
-            return result
-        elif ctx.functionCall():
-            result = self.visit(ctx.functionCall())
-            return result
-        elif ctx.IDENTIFIER():
-            var_name = ctx.IDENTIFIER().getText()
-            
-            # Kiểm tra nếu là tên hàm và được gọi trực tiếp
-            if var_name in self.functions and ctx.getChildCount() == 1:
-                # Gọi hàm không tham số
-                function_def = self.functions[var_name]
-                
-                # Kiểm tra nếu hàm yêu cầu tham số
-                if len(function_def['params']) > 0:
-                    raise ValueError(f"Function '{var_name}' requires {len(function_def['params'])} arguments, got 0")
-                
-                # Lưu môi trường hiện tại
-                previous_env = self.env
-                
-                # Tạo môi trường mới
-                function_env = SymbolTable(previous_env)
-                
-                # Đặt môi trường mới
-                self.env = function_env
-                
-                result = None
-                try:
-                    # Lấy thân hàm
-                    body = function_def['body']
-                    
-                    # Thực thi từng câu lệnh
-                    for i in range(body.getChildCount()):
-                        stmt = body.getChild(i)
-                        stmt_result = self.visit(stmt)
-                        
-                        if isinstance(stmt_result, ReturnValue):
-                            result = stmt_result.value
-                            break
-                        elif stmt_result is not None:
-                            result = stmt_result
-                except Exception as e:
-                    raise e
-                finally:
-                    # Khôi phục môi trường cũ
-                    self.env = previous_env
-                
-                return result
-            else:
-                # Nếu không phải hàm, xử lý như biến thông thường
-                try:
-                    result = self.env.resolve(var_name)
-                    return result
-                except NameError as e:
-                    # Nếu không tìm thấy biến, trả về exception thay vì ném ra
-                    return e
-        
-        # Xử lý biểu thức lồng nhau trong ngoặc đơn: '(' expression ')'
-        if ctx.getChildCount() >= 3 and ctx.getChild(0).getText() == '(' and ctx.getChild(2).getText() == ')':
-            # Lấy biểu thức con ở giữa
-            inner_expr = ctx.getChild(1)
-            result = self.visit(inner_expr)
-            
-            # Nếu kết quả là exception, ném ra
-            if isinstance(result, Exception):
-                raise result
-                
-            return result
-            
-        return None
-
     def visitListOpExpr(self, ctx):
-        # Determine which operation we're dealing with
         operation = ctx.getChild(0).getText()
-        
-        # Debug the structure
-        print(f"DEBUG ListOp: operation={operation}, children={[ctx.getChild(i).getText() for i in range(ctx.getChildCount())]}")
-        
-        # Variables to store the list and index if needed
         lst = None
-        
-        if operation == 'head' or operation == 'tail':
-            # Get the list from the appropriate child
-            # Format could be: head(mylist) or head mylist
-            # Try different child indices to find the list
-            
-            # First try standard format with parentheses
-            if ctx.getChildCount() >= 3:
-                list_node = ctx.getChild(2)
-                lst = self.visit(list_node)
+        index = None
+
+        try:
+            if operation == 'head' or operation == 'tail' or operation == 'sizeof':
+                # Grammar: op expression
+                if ctx.expression() and len(ctx.expression()) > 0:
+                    expr_ctx = ctx.expression(0)
+                    lst = self.visit(expr_ctx)
+                # Fallback or alternative handling might be needed if IDENTIFIER is a separate path
+                # depending on exact ANTLR parse tree structure for 'expression | IDENTIFIER' 
+                # but grammar now uses just 'expression' which covers IDENTIFIER.
+                else:
+                     # Attempt to resolve as identifier if direct expression visit fails or is not present
+                     # This assumes the argument might be just an identifier text not parsed as expression rule
+                     # This part might be less robust than relying solely on ctx.expression(0)
+                     var_name = ctx.getChild(1).getText() # Less specific than ctx.IDENTIFIER()
+                     try:
+                         lst = self.env.resolve(var_name)
+                     except Exception as resolve_err:
+                         print(f"DEBUG ListOp: Failed to resolve potential identifier {var_name}: {resolve_err}")
+                         raise NameError(f"Variable '{var_name}' is not defined")
+
+            elif operation == 'getid':
+                 # Grammar: 'getid' expression expression
+                 if not ctx.expression() or len(ctx.expression()) < 2:
+                     raise ValueError("getid requires an index expression and a list expression")
+                 
+                 # Get index (first expression)
+                 index_expr_ctx = ctx.expression(0)
+                 index = self.visit(index_expr_ctx)
+                 if not isinstance(index, int):
+                     raise TypeError(f"Index must be an integer, got {type(index).__name__}")
+
+                 # Get list (second expression)
+                 list_expr_ctx = ctx.expression(1)
+                 lst = self.visit(list_expr_ctx)
                 
-                # If list_node was a variable name, lst might need further resolution
-                if not isinstance(lst, list) and isinstance(lst, str):
-                    try:
-                        lst = self.env.resolve(lst)
-                    except:
-                        # If that fails, try directly as an identifier
-                        var_name = list_node.getText()
-                        lst = self.env.resolve(var_name)
-            
-        elif operation == 'getid':
-            # Format: getid expression(mylist) or getid expression mylist
-            
-            # Get the index
-            if ctx.getChildCount() >= 2:
-                index_expr = ctx.getChild(1)
-                index = self.visit(index_expr)
-                
-                if not isinstance(index, int):
-                    raise TypeError(f"Index must be an integer, got {type(index).__name__}")
-                
-                # Get the list
-                if ctx.getChildCount() >= 4:
-                    list_node = ctx.getChild(3)
-                    lst = self.visit(list_node)
-                    
-                    # If list_node was a variable name, lst might need further resolution
-                    if not isinstance(lst, list) and isinstance(lst, str):
-                        try:
-                            lst = self.env.resolve(lst)
-                        except:
-                            # If that fails, try directly as an identifier
-                            var_name = list_node.getText()
-                            lst = self.env.resolve(var_name)
-            
-        # Validate and perform the operation
+        except Exception as e:
+            # Log the original error for clarity
+            # print(f"DEBUG ListOp: Caught exception during argument evaluation: {e}")
+            raise ValueError(f"Error evaluating {operation} expression: {str(e)}")
+
+        # Kiểm tra và thực hiện thao tác
         if lst is not None:
             if not isinstance(lst, list):
-                raise TypeError(f"Expected a list but got {type(lst).__name__} with value {lst}")
+                raise TypeError(f"Expected a list but got {type(lst).__name__}")
                 
-            if not lst:
+            if not lst and operation != 'sizeof':
                 raise ValueError(f"Cannot perform {operation} on empty list")
                 
             if operation == 'head':
-                # Return the first element of the list
                 return lst[0]
             elif operation == 'tail':
-                # Return all elements except the first one
                 return lst[1:]
             elif operation == 'getid':
-                # Return the element at the specified index
                 if index < 0 or index >= len(lst):
                     raise IndexError(f"Index {index} out of range for list of length {len(lst)}")
                 return lst[index]
+            elif operation == 'sizeof':
+                return len(lst)
         
-        # If no valid list or operation was found
-        print(f"DEBUG: Unable to process ListOp {operation}")
-        return None
+        raise ValueError(f"Could not evaluate list expression for {operation}")
 
     def visitChildren(self, ctx):
         # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể

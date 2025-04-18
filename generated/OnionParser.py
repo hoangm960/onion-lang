@@ -10,7 +10,7 @@ else:
 
 def serializedATN():
     return [
-        4,1,43,328,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,43,317,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,
         2,14,7,14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,
         7,20,2,21,7,21,2,22,7,22,2,23,7,23,2,24,7,24,1,0,4,0,52,8,0,11,0,
@@ -29,21 +29,20 @@ def serializedATN():
         12,10,12,12,12,215,9,12,1,12,1,12,1,12,1,13,1,13,1,13,1,14,1,14,
         5,14,225,8,14,10,14,12,14,228,9,14,1,15,1,15,1,15,1,16,1,16,1,16,
         1,16,1,16,1,16,1,16,1,16,1,16,1,16,1,16,3,16,244,8,16,1,16,1,16,
-        1,16,1,16,1,16,1,16,1,16,3,16,253,8,16,1,17,1,17,1,17,3,17,258,8,
-        17,1,17,1,17,1,17,3,17,263,8,17,1,17,1,17,1,17,1,17,3,17,269,8,17,
-        1,17,1,17,1,17,3,17,274,8,17,3,17,276,8,17,1,18,1,18,1,18,1,18,5,
-        18,282,8,18,10,18,12,18,285,9,18,1,18,1,18,1,18,1,19,1,19,5,19,292,
-        8,19,10,19,12,19,295,9,19,1,20,1,20,1,20,1,20,1,21,1,21,4,21,303,
-        8,21,11,21,12,21,304,1,21,1,21,1,22,1,22,1,22,1,22,5,22,313,8,22,
-        10,22,12,22,316,9,22,1,22,1,22,1,22,1,23,4,23,322,8,23,11,23,12,
-        23,323,1,24,1,24,1,24,0,0,25,0,2,4,6,8,10,12,14,16,18,20,22,24,26,
-        28,30,32,34,36,38,40,42,44,46,48,0,1,1,0,36,39,357,0,51,1,0,0,0,
+        1,16,1,16,1,16,1,16,1,16,3,16,253,8,16,1,17,1,17,1,17,1,17,1,17,
+        1,17,1,17,1,17,1,17,1,17,3,17,265,8,17,1,18,1,18,1,18,1,18,5,18,
+        271,8,18,10,18,12,18,274,9,18,1,18,1,18,1,18,1,19,1,19,5,19,281,
+        8,19,10,19,12,19,284,9,19,1,20,1,20,1,20,1,20,1,21,1,21,4,21,292,
+        8,21,11,21,12,21,293,1,21,1,21,1,22,1,22,1,22,1,22,5,22,302,8,22,
+        10,22,12,22,305,9,22,1,22,1,22,1,22,1,23,4,23,311,8,23,11,23,12,
+        23,312,1,24,1,24,1,24,0,0,25,0,2,4,6,8,10,12,14,16,18,20,22,24,26,
+        28,30,32,34,36,38,40,42,44,46,48,0,1,1,0,36,39,342,0,51,1,0,0,0,
         2,57,1,0,0,0,4,71,1,0,0,0,6,77,1,0,0,0,8,92,1,0,0,0,10,100,1,0,0,
         0,12,110,1,0,0,0,14,132,1,0,0,0,16,160,1,0,0,0,18,162,1,0,0,0,20,
         169,1,0,0,0,22,190,1,0,0,0,24,207,1,0,0,0,26,219,1,0,0,0,28,222,
-        1,0,0,0,30,229,1,0,0,0,32,252,1,0,0,0,34,275,1,0,0,0,36,277,1,0,
-        0,0,38,289,1,0,0,0,40,296,1,0,0,0,42,300,1,0,0,0,44,308,1,0,0,0,
-        46,321,1,0,0,0,48,325,1,0,0,0,50,52,3,2,1,0,51,50,1,0,0,0,52,53,
+        1,0,0,0,30,229,1,0,0,0,32,252,1,0,0,0,34,264,1,0,0,0,36,266,1,0,
+        0,0,38,278,1,0,0,0,40,285,1,0,0,0,42,289,1,0,0,0,44,297,1,0,0,0,
+        46,310,1,0,0,0,48,314,1,0,0,0,50,52,3,2,1,0,51,50,1,0,0,0,52,53,
         1,0,0,0,53,51,1,0,0,0,53,54,1,0,0,0,54,55,1,0,0,0,55,56,5,0,0,1,
         56,1,1,0,0,0,57,58,5,1,0,0,58,59,3,4,2,0,59,60,5,2,0,0,60,3,1,0,
         0,0,61,72,3,8,4,0,62,72,3,10,5,0,63,72,3,30,15,0,64,72,3,36,18,0,
@@ -103,30 +102,26 @@ def serializedATN():
         244,3,10,5,0,243,242,1,0,0,0,243,244,1,0,0,0,244,245,1,0,0,0,245,
         246,5,2,0,0,246,247,3,46,23,0,247,253,1,0,0,0,248,249,5,29,0,0,249,
         250,3,10,5,0,250,251,3,46,23,0,251,253,1,0,0,0,252,232,1,0,0,0,252,
-        236,1,0,0,0,252,248,1,0,0,0,253,33,1,0,0,0,254,257,5,30,0,0,255,
-        258,3,18,9,0,256,258,5,40,0,0,257,255,1,0,0,0,257,256,1,0,0,0,258,
-        276,1,0,0,0,259,262,5,31,0,0,260,263,3,18,9,0,261,263,5,40,0,0,262,
-        260,1,0,0,0,262,261,1,0,0,0,263,276,1,0,0,0,264,265,5,32,0,0,265,
-        268,3,10,5,0,266,269,3,18,9,0,267,269,5,40,0,0,268,266,1,0,0,0,268,
-        267,1,0,0,0,269,276,1,0,0,0,270,273,5,33,0,0,271,274,3,18,9,0,272,
-        274,5,40,0,0,273,271,1,0,0,0,273,272,1,0,0,0,274,276,1,0,0,0,275,
-        254,1,0,0,0,275,259,1,0,0,0,275,264,1,0,0,0,275,270,1,0,0,0,276,
-        35,1,0,0,0,277,278,5,34,0,0,278,279,5,40,0,0,279,283,5,1,0,0,280,
-        282,5,40,0,0,281,280,1,0,0,0,282,285,1,0,0,0,283,281,1,0,0,0,283,
-        284,1,0,0,0,284,286,1,0,0,0,285,283,1,0,0,0,286,287,5,2,0,0,287,
-        288,3,46,23,0,288,37,1,0,0,0,289,293,5,40,0,0,290,292,3,10,5,0,291,
-        290,1,0,0,0,292,295,1,0,0,0,293,291,1,0,0,0,293,294,1,0,0,0,294,
-        39,1,0,0,0,295,293,1,0,0,0,296,297,5,35,0,0,297,298,5,40,0,0,298,
-        299,3,42,21,0,299,41,1,0,0,0,300,302,5,1,0,0,301,303,3,44,22,0,302,
-        301,1,0,0,0,303,304,1,0,0,0,304,302,1,0,0,0,304,305,1,0,0,0,305,
-        306,1,0,0,0,306,307,5,2,0,0,307,43,1,0,0,0,308,309,5,23,0,0,309,
-        310,5,40,0,0,310,314,5,1,0,0,311,313,5,40,0,0,312,311,1,0,0,0,313,
-        316,1,0,0,0,314,312,1,0,0,0,314,315,1,0,0,0,315,317,1,0,0,0,316,
-        314,1,0,0,0,317,318,5,2,0,0,318,319,3,46,23,0,319,45,1,0,0,0,320,
-        322,3,2,1,0,321,320,1,0,0,0,322,323,1,0,0,0,323,321,1,0,0,0,323,
-        324,1,0,0,0,324,47,1,0,0,0,325,326,7,0,0,0,326,49,1,0,0,0,30,53,
-        71,77,90,92,100,110,116,126,132,160,166,180,188,198,205,213,226,
-        243,252,257,262,268,273,275,283,293,304,314,323
+        236,1,0,0,0,252,248,1,0,0,0,253,33,1,0,0,0,254,255,5,30,0,0,255,
+        265,3,10,5,0,256,257,5,31,0,0,257,265,3,10,5,0,258,259,5,32,0,0,
+        259,260,3,10,5,0,260,261,3,10,5,0,261,265,1,0,0,0,262,263,5,33,0,
+        0,263,265,3,10,5,0,264,254,1,0,0,0,264,256,1,0,0,0,264,258,1,0,0,
+        0,264,262,1,0,0,0,265,35,1,0,0,0,266,267,5,34,0,0,267,268,5,40,0,
+        0,268,272,5,1,0,0,269,271,5,40,0,0,270,269,1,0,0,0,271,274,1,0,0,
+        0,272,270,1,0,0,0,272,273,1,0,0,0,273,275,1,0,0,0,274,272,1,0,0,
+        0,275,276,5,2,0,0,276,277,3,46,23,0,277,37,1,0,0,0,278,282,5,40,
+        0,0,279,281,3,10,5,0,280,279,1,0,0,0,281,284,1,0,0,0,282,280,1,0,
+        0,0,282,283,1,0,0,0,283,39,1,0,0,0,284,282,1,0,0,0,285,286,5,35,
+        0,0,286,287,5,40,0,0,287,288,3,42,21,0,288,41,1,0,0,0,289,291,5,
+        1,0,0,290,292,3,44,22,0,291,290,1,0,0,0,292,293,1,0,0,0,293,291,
+        1,0,0,0,293,294,1,0,0,0,294,295,1,0,0,0,295,296,5,2,0,0,296,43,1,
+        0,0,0,297,298,5,23,0,0,298,299,5,40,0,0,299,303,5,1,0,0,300,302,
+        5,40,0,0,301,300,1,0,0,0,302,305,1,0,0,0,303,301,1,0,0,0,303,304,
+        1,0,0,0,304,306,1,0,0,0,305,303,1,0,0,0,306,307,5,2,0,0,307,308,
+        3,46,23,0,308,45,1,0,0,0,309,311,3,2,1,0,310,309,1,0,0,0,311,312,
+        1,0,0,0,312,310,1,0,0,0,312,313,1,0,0,0,313,47,1,0,0,0,314,315,7,
+        0,0,0,315,49,1,0,0,0,26,53,71,77,90,92,100,110,116,126,132,160,166,
+        180,188,198,205,213,226,243,252,264,272,282,293,303,312
     ]
 
 class OnionParser ( Parser ):
@@ -1693,15 +1688,11 @@ class OnionParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def listExpr(self):
-            return self.getTypedRuleContext(OnionParser.ListExprContext,0)
-
-
-        def IDENTIFIER(self):
-            return self.getToken(OnionParser.IDENTIFIER, 0)
-
-        def expression(self):
-            return self.getTypedRuleContext(OnionParser.ExpressionContext,0)
+        def expression(self, i:int=None):
+            if i is None:
+                return self.getTypedRuleContexts(OnionParser.ExpressionContext)
+            else:
+                return self.getTypedRuleContext(OnionParser.ExpressionContext,i)
 
 
         def getRuleIndex(self):
@@ -1729,86 +1720,38 @@ class OnionParser ( Parser ):
         localctx = OnionParser.ListOpExprContext(self, self._ctx, self.state)
         self.enterRule(localctx, 34, self.RULE_listOpExpr)
         try:
-            self.state = 275
+            self.state = 264
             self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [30]:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 254
                 self.match(OnionParser.T__29)
-                self.state = 257
-                self._errHandler.sync(self)
-                token = self._input.LA(1)
-                if token in [17]:
-                    self.state = 255
-                    self.listExpr()
-                    pass
-                elif token in [40]:
-                    self.state = 256
-                    self.match(OnionParser.IDENTIFIER)
-                    pass
-                else:
-                    raise NoViableAltException(self)
-
+                self.state = 255
+                self.expression()
                 pass
             elif token in [31]:
                 self.enterOuterAlt(localctx, 2)
-                self.state = 259
+                self.state = 256
                 self.match(OnionParser.T__30)
-                self.state = 262
-                self._errHandler.sync(self)
-                token = self._input.LA(1)
-                if token in [17]:
-                    self.state = 260
-                    self.listExpr()
-                    pass
-                elif token in [40]:
-                    self.state = 261
-                    self.match(OnionParser.IDENTIFIER)
-                    pass
-                else:
-                    raise NoViableAltException(self)
-
+                self.state = 257
+                self.expression()
                 pass
             elif token in [32]:
                 self.enterOuterAlt(localctx, 3)
-                self.state = 264
+                self.state = 258
                 self.match(OnionParser.T__31)
-                self.state = 265
+                self.state = 259
                 self.expression()
-                self.state = 268
-                self._errHandler.sync(self)
-                token = self._input.LA(1)
-                if token in [17]:
-                    self.state = 266
-                    self.listExpr()
-                    pass
-                elif token in [40]:
-                    self.state = 267
-                    self.match(OnionParser.IDENTIFIER)
-                    pass
-                else:
-                    raise NoViableAltException(self)
-
+                self.state = 260
+                self.expression()
                 pass
             elif token in [33]:
                 self.enterOuterAlt(localctx, 4)
-                self.state = 270
+                self.state = 262
                 self.match(OnionParser.T__32)
-                self.state = 273
-                self._errHandler.sync(self)
-                token = self._input.LA(1)
-                if token in [17]:
-                    self.state = 271
-                    self.listExpr()
-                    pass
-                elif token in [40]:
-                    self.state = 272
-                    self.match(OnionParser.IDENTIFIER)
-                    pass
-                else:
-                    raise NoViableAltException(self)
-
+                self.state = 263
+                self.expression()
                 pass
             else:
                 raise NoViableAltException(self)
@@ -1866,25 +1809,25 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 277
+            self.state = 266
             self.match(OnionParser.T__33)
-            self.state = 278
+            self.state = 267
             self.match(OnionParser.IDENTIFIER)
-            self.state = 279
+            self.state = 268
             self.match(OnionParser.T__0)
-            self.state = 283
+            self.state = 272
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la==40:
-                self.state = 280
+                self.state = 269
                 self.match(OnionParser.IDENTIFIER)
-                self.state = 285
+                self.state = 274
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
 
-            self.state = 286
+            self.state = 275
             self.match(OnionParser.T__1)
-            self.state = 287
+            self.state = 276
             self.block()
         except RecognitionException as re:
             localctx.exception = re
@@ -1939,15 +1882,15 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 289
+            self.state = 278
             self.match(OnionParser.IDENTIFIER)
-            self.state = 293
+            self.state = 282
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while (((_la) & ~0x3f) == 0 and ((1 << _la) & 2130303778818) != 0):
-                self.state = 290
+                self.state = 279
                 self.expression()
-                self.state = 295
+                self.state = 284
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
 
@@ -2000,11 +1943,11 @@ class OnionParser ( Parser ):
         self.enterRule(localctx, 40, self.RULE_classDef)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 296
+            self.state = 285
             self.match(OnionParser.T__34)
-            self.state = 297
+            self.state = 286
             self.match(OnionParser.IDENTIFIER)
-            self.state = 298
+            self.state = 287
             self.classBody()
         except RecognitionException as re:
             localctx.exception = re
@@ -2056,21 +1999,21 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 300
+            self.state = 289
             self.match(OnionParser.T__0)
-            self.state = 302 
+            self.state = 291 
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
-                self.state = 301
+                self.state = 290
                 self.methodDef()
-                self.state = 304 
+                self.state = 293 
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if not (_la==23):
                     break
 
-            self.state = 306
+            self.state = 295
             self.match(OnionParser.T__1)
         except RecognitionException as re:
             localctx.exception = re
@@ -2125,25 +2068,25 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 308
+            self.state = 297
             self.match(OnionParser.T__22)
-            self.state = 309
+            self.state = 298
             self.match(OnionParser.IDENTIFIER)
-            self.state = 310
+            self.state = 299
             self.match(OnionParser.T__0)
-            self.state = 314
+            self.state = 303
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la==40:
-                self.state = 311
+                self.state = 300
                 self.match(OnionParser.IDENTIFIER)
-                self.state = 316
+                self.state = 305
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
 
-            self.state = 317
+            self.state = 306
             self.match(OnionParser.T__1)
-            self.state = 318
+            self.state = 307
             self.block()
         except RecognitionException as re:
             localctx.exception = re
@@ -2195,13 +2138,13 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 321 
+            self.state = 310 
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
-                self.state = 320
+                self.state = 309
                 self.statement()
-                self.state = 323 
+                self.state = 312 
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if not (_la==1):
@@ -2262,7 +2205,7 @@ class OnionParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 325
+            self.state = 314
             _la = self._input.LA(1)
             if not((((_la) & ~0x3f) == 0 and ((1 << _la) & 1030792151040) != 0)):
                 self._errHandler.recoverInline(self)

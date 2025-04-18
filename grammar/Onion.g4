@@ -103,10 +103,10 @@ loopStatement
     ;
 
 listOpExpr
-    : 'head' (listExpr | IDENTIFIER)
-    | 'tail' (listExpr | IDENTIFIER)
-    | 'getid' expression (listExpr | IDENTIFIER)
-    | 'sizeof' (listExpr | IDENTIFIER)
+    : 'head' expression
+    | 'tail' expression
+    | 'getid' expression expression // Index is the first expr, list is the second
+    | 'sizeof' expression
     ;
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
