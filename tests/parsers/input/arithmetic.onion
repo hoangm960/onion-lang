@@ -1,7 +1,0 @@
-// Arithmetic Tests
-(let x (+ 1 2 3))                   // Addition
-(let y (* 2 3 4))                   // Multiplication
-(let z (- 10 5 2))                  // Subtraction
-(let w (/ 20 2 2))                  // Division
-(inc x)                             // Increment
-(dec y)                             // Decrement
