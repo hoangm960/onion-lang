@@ -1,5 +1,0 @@
-// List Tests
-(let emptyList (list))              // Empty list
-(let numList (list 1 2 3 4 5))      // Number list
-(let mixedList (list 1 "hello" true))  // Mixed types
-(print numList)                      // List output

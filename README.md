@@ -50,9 +50,29 @@ To test all test files:
 ```bash
 >>> runall
 ```
-Outputs of the test cases will be displays at the terminal and saved to *tests/parsers/outputs/* 
+Outputs of the test cases will be displayed at the terminal and saved to *tests/parsers/outputs/* 
 ### Fix grammar
 The grammar file located at: *grammar/Onion.g4*. After fixing, run:
 ```bash
 antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
 ```
+
+## Using the REPL (Read-Evaluate-Print Loop)
+
+The REPL is an interactive environment for executing Onion code. To start the REPL, run:
+
+```bash
+python main.py
+```
+
+### REPL Commands:
+
+- `help`: Display usage instructions and code examples
+- `run <filename>`: Execute a specific Onion file (can be a relative or absolute path)
+  - Example: `run arithmetic.onion` or `run tests/parsers/input/arithmetic.onion`
+- `run <filename> -s` or `run <filename> --save`: Run a file and save the results to the tests/parsers/output/ directory
+- `runall`: Run all .onion files in the tests/parsers/input directory and save results to the tests/parsers/output/ directory
+- `clear`: Clear the terminal screen
+- `exit` or `quit`: Exit the REPL
+
+### Onion Code Examples:

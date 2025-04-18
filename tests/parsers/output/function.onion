@@ -1,9 +1,0 @@
-program:
- statement:
-  expression:
-   functionCall:
-    factorial:
-     expression:
-      literal:
-       5
- <EOF>

@@ -19,6 +19,11 @@ class OnionVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by OnionParser#statementType.
+    def visitStatementType(self, ctx:OnionParser.StatementTypeContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by OnionParser#incDecStmt.
     def visitIncDecStmt(self, ctx:OnionParser.IncDecStmtContext):
         return self.visitChildren(ctx)
@@ -31,6 +36,11 @@ class OnionVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by OnionParser#expression.
     def visitExpression(self, ctx:OnionParser.ExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#compoundExpr.
+    def visitCompoundExpr(self, ctx:OnionParser.CompoundExprContext):
         return self.visitChildren(ctx)
 
 
@@ -81,6 +91,11 @@ class OnionVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by OnionParser#loopStatement.
     def visitLoopStatement(self, ctx:OnionParser.LoopStatementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by OnionParser#listOpExpr.
+    def visitListOpExpr(self, ctx:OnionParser.ListOpExprContext):
         return self.visitChildren(ctx)
 
 

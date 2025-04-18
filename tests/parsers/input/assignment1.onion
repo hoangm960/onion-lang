@@ -1,4 +1,0 @@
-// Assignment Tests
-(let x 10)                           // Single assignment
-(let (a 1) (b 2) (c 3))             // Multiple assignment
-(let myList (list 1 2 3))           // Assignment with expression

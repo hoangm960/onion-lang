@@ -26,6 +26,15 @@ class OnionListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by OnionParser#statementType.
+    def enterStatementType(self, ctx:OnionParser.StatementTypeContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#statementType.
+    def exitStatementType(self, ctx:OnionParser.StatementTypeContext):
+        pass
+
+
     # Enter a parse tree produced by OnionParser#incDecStmt.
     def enterIncDecStmt(self, ctx:OnionParser.IncDecStmtContext):
         pass
@@ -50,6 +59,15 @@ class OnionListener(ParseTreeListener):
 
     # Exit a parse tree produced by OnionParser#expression.
     def exitExpression(self, ctx:OnionParser.ExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#compoundExpr.
+    def enterCompoundExpr(self, ctx:OnionParser.CompoundExprContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#compoundExpr.
+    def exitCompoundExpr(self, ctx:OnionParser.CompoundExprContext):
         pass
 
 
@@ -140,6 +158,15 @@ class OnionListener(ParseTreeListener):
 
     # Exit a parse tree produced by OnionParser#loopStatement.
     def exitLoopStatement(self, ctx:OnionParser.LoopStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by OnionParser#listOpExpr.
+    def enterListOpExpr(self, ctx:OnionParser.ListOpExprContext):
+        pass
+
+    # Exit a parse tree produced by OnionParser#listOpExpr.
+    def exitListOpExpr(self, ctx:OnionParser.ListOpExprContext):
         pass
 
 
