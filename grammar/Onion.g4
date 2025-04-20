@@ -6,144 +6,123 @@ grammar Onion;
 
 program: statement+ EOF; // Added EOF for completeness
 
-statement
-    : '(' statementType ')'
-    ;
+statement: '(' statementType ')';
 
-statementType
-    : assignment
-    | expression
-    | printStatement
-    | macroDef
-    | classDef
-    | loopStatement
-    | incDecStmt
-    | functionDef
-    | returnStmt
-    | block
-    | functionCall 
-    ;
+statementType:
+	assignment
+	| expression
+	| printStatement
+	| macroDef
+	| classDef
+	| loopStatement
+	| incDecStmt
+	| functionDef
+	| returnStmt
+	| block
+	| functionCall
+	| ifExpr // allow if as a top-level statement
+	| branchExpr ; // allow cond as a top-level statement
 
-incDecStmt
-    : 'inc' IDENTIFIER  // Increment: (inc x)
-    | 'dec' IDENTIFIER  // Decrement: (dec x)
-    ;
+incDecStmt:
+	'inc' IDENTIFIER // Increment: (inc x)
+	| 'dec' IDENTIFIER ; // Decrement: (dec x)
 
-assignment
-    : 'let' IDENTIFIER expression
-    | 'let' ( '(' IDENTIFIER expression ')' )+
-    ;
+assignment:
+	'let' IDENTIFIER expression
+	| 'let' ( '(' IDENTIFIER expression ')')+;
 
-expression
-    : literal
-    | IDENTIFIER
-    | '(' compoundExpr ')' 
-    ;
+expression: literal | IDENTIFIER | '(' compoundExpr ')';
 
-compoundExpr
-    : arithmeticExpr
-    | booleanExpr
-    | listExpr
-    | functionCall
-    | ifExpr
-    | branchExpr 
-    | macroCall
-    | listOpExpr
-    ;
+compoundExpr:
+	arithmeticExpr
+	| booleanExpr
+	| listExpr
+	| functionCall
+	| ifExpr
+	| branchExpr
+	| macroCall
+	| listOpExpr;
 
+arithmeticExpr:
+	'+' expression+
+	| '-' expression expression
+	| '*' expression+
+	| '/' expression expression;
 
-arithmeticExpr
-    : '+' expression+
-    | '-' expression expression
-    | '*' expression+
-    | '/' expression expression
-    ;
-
-booleanExpr
-    : '==' expression expression
-    | '!=' expression expression
-    | '<' expression expression
-    | '>' expression expression
-    | '<=' expression expression
-    | '>=' expression expression
-    | 'not' expression
-    ;
+booleanExpr:
+	'==' expression expression
+	| '!=' expression expression
+	| '<' expression expression
+	| '>' expression expression
+	| '<=' expression expression
+	| '>=' expression expression
+	| 'not' expression;
 
 listExpr: 'list' expression*; // Allow empty lists (list)
 
-ifExpr
-    : 'if' expression statement                      
-      ( '(' 'elif' expression statement ')' )*           
-      ( '(' 'else' statement ')' )?
-    ;
+ifExpr:
+	'if' expression statement (
+		'(' 'elif' expression statement ')'
+	)* ('(' 'else' statement ')')?;
 
-branchExpr
-    : 'cond'
-        ( '(' expression statement ')' )+
-        ( '(' 't' statement ')' )?
-    ;
+branchExpr:
+	'cond' ('(' expression statement ')')+ (
+		'(' 't' statement ')'
+	)?;
 
-functionDef
-    : 'def' IDENTIFIER
-        '(' (IDENTIFIER)* ')' // Simplified parameter list - allows zero params
-        block
-    ;
+functionDef:
+	'def' IDENTIFIER '(' (IDENTIFIER)* ')' // Simplified parameter list - allows zero params
+	block;
 
-returnStmt
-    : 'return' expression
-    ;
+returnStmt: 'return' expression;
 
-functionCall: IDENTIFIER expression*; // Simplified argument list - allows zero args
+functionCall:
+	IDENTIFIER expression*; // Simplified argument list - allows zero args
 
 printStatement: 'print' expression;
 
-loopStatement
-    : 'repeat' expression block                                     
-    | 'loop' IDENTIFIER 'range' '(' expression expression (expression)? ')' block
-    | 'while' expression block                            
-    ;
+loopStatement:
+	'repeat' expression block
+	| 'loop' IDENTIFIER 'range' '(' expression expression (
+		expression
+	)? ')' block
+	| 'while' expression block;
 
-listOpExpr
-    : 'head' expression
-    | 'tail' expression
-    | 'getid' expression expression 
-    | 'sizeof' expression
-    ;
+listOpExpr:
+	'head' expression
+	| 'tail' expression
+	| 'getid' expression expression
+	| 'sizeof' expression;
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
-macroDef: 'macro' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
+macroDef:
+	'macro' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
 
 macroCall: IDENTIFIER expression*; // Simplified args
 
 classDef: 'class' IDENTIFIER classBody;
 
-classBody
-    : '(' methodDef+ ')'
-    ;
+classBody: '(' methodDef+ ')';
 
-methodDef: 'def' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
+methodDef:
+	'def' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
 
 block: statement+;
 
-literal
-    : INT
-    | FLOAT
-    | BOOL      
-    | STRING
-    ;
+literal: INT | FLOAT | BOOL | STRING;
 
 // Keywords as Tokens (matched before IDENTIFIER)
-BOOL:       'true' | 'false';
+BOOL: 'true' | 'false';
 
 // Literals
-INT:        [0-9]+;
-FLOAT:      [0-9]* '.' [0-9]+;
-STRING:     '"' (~["\r\n])*? '"' ;
+INT: [0-9]+;
+FLOAT: [0-9]* '.' [0-9]+;
+STRING: '"' (~["\r\n])*? '"';
 
 // Identifier (comes AFTER specific keywords like BOOL)
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 
 // Skip whitespace and comments
-WS:         [ \t\r\n]+ -> skip;
-COMMENT:    '/*' .*? '*/' -> skip; // Non-greedy match
+WS: [ \t\r\n]+ -> skip;
+COMMENT: '/*' .*? '*/' -> skip; // Non-greedy match
 LINE_COMMENT: '//' ~[\r\n]* -> skip;
