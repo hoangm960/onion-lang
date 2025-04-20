@@ -3,4 +3,5 @@ __pycache__/
 */__pycache__/
 .venv/
 tests/
-generated/
+generated/*
+!generated/__init__.py
