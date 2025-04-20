@@ -161,14 +161,14 @@ class TestOnionLanguage(unittest.TestCase):
         """
         self.assertOnionOutput(code, ["5", "120"])
 
-    # def test_macros(self):
-    #     code = """
-    #     (macro double (x)
-    #         (print (* x 2))
-    #     )
-    #     (double 7)
-    #     """
-    #     self.assertOnionOutput(code, ["14"])
+    def test_macros(self):
+        code = """
+        (macro double (x)
+            (print (* x 2))
+        )
+        (double 7)
+        """
+        self.assertOnionOutput(code, ["14"])
 
 
 if __name__ == "__main__":

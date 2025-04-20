@@ -46,7 +46,7 @@ class SymbolTable:
 class Interpreter(OnionVisitor):
     def __init__(self):
         self.env = SymbolTable()
-        self.functions = {}  # Lưu trữ các định nghĩa hàm
+        self.macros = {}  # Lưu trữ các định nghĩa hàm
 
     def visitProgram(self, ctx):
         result = None
@@ -59,7 +59,7 @@ class Interpreter(OnionVisitor):
                 var_name = str(result).split("'")[1]
 
                 # Kiểm tra xem có phải là tên hàm không
-                if var_name in self.functions:
+                if var_name in self.macros:
                     # Đây là lời gọi hàm không tham số
                     try:
                         # Tạo môi trường mới
@@ -72,7 +72,7 @@ class Interpreter(OnionVisitor):
                         self.env = function_env
 
                         # Lấy thân hàm từ định nghĩa hàm
-                        body = self.functions[var_name]['body']
+                        body = self.macros[var_name]['body']
 
                         # Thực thi thân hàm
                         call_result = None
@@ -580,7 +580,7 @@ class Interpreter(OnionVisitor):
             block_node = ctx.block()
 
             # Lưu trữ thông tin hàm
-            self.functions[function_name] = {
+            self.macros[function_name] = {
                 'params': params,
                 'body': block_node
             }
@@ -592,11 +592,11 @@ class Interpreter(OnionVisitor):
         # Lấy tên hàm từ IDENTIFIER
         function_name = ctx.IDENTIFIER().getText()
 
-        if function_name not in self.functions:
+        if function_name not in self.macros:
             raise NameError(f"Function '{function_name}' is not defined")
 
         # Lấy định nghĩa hàm
-        function_def = self.functions[function_name]
+        function_def = self.macros[function_name]
         params = function_def['params']
         body = function_def['body']
 
@@ -794,3 +794,63 @@ class Interpreter(OnionVisitor):
             return self.visit(ctx.statement(last_statement_index))
 
         return None
+
+    def visitMacroDef(self, ctx):
+        identifiers = ctx.IDENTIFIER()
+
+        if len(identifiers) > 0:
+            macro_name = identifiers[0].getText()
+
+            params = []
+            for i in range(1, len(identifiers)):
+                param_name = identifiers[i].getText()
+                params.append(param_name)
+
+            block_node = ctx.block()
+
+            self.macros[macro_name] = {
+                'params': params,
+                'body': block_node
+            }
+
+        return None
+
+    def visitMacroCall(self, ctx):
+        macro_name = ctx.IDENTIFIER().getText()
+
+        if macro_name not in self.macros:
+            raise NameError(f"Macro '{macro_name}' is not defined")
+
+        macro_def = self.macros[macro_name]
+        params = macro_def['params']
+        body = macro_def['body']
+
+        args = []
+        for expr in ctx.expression():
+            arg_value = self.visit(expr)
+            args.append(arg_value)
+
+        if len(args) != len(params):
+            raise ValueError(f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}")
+
+        previous_env = self.env
+        macro_env = SymbolTable(previous_env)
+
+        for i, param in enumerate(params):
+            macro_env.define(param, args[i])
+
+        result = None
+        try:
+            self.env = macro_env
+            for i in range(body.getChildCount()):
+                stmt = body.getChild(i)
+                stmt_result = self.visit(stmt)
+                if isinstance(stmt_result, ReturnValue):
+                    result = stmt_result.value
+                    break
+                elif stmt_result is not None:
+                    result = stmt_result
+        finally:
+            self.env = previous_env
+
+        return result
