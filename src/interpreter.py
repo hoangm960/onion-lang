@@ -742,18 +742,13 @@ class Interpreter(OnionVisitor):
 
     def visitIfExpr(self, ctx):
         """Xử lý biểu thức if-elif-else"""
-        # Lấy điều kiện IF ban đầu
-        if_condition = ctx.expression(0)
-        if_value = self.visit(if_condition)
+        # First expression is the condition
+        if_value = self.visit(ctx.expression(0))
 
         if if_value:
-            # Nếu điều kiện IF đúng, thực thi statement của IF
             return self.visit(ctx.statement(0))
         else:
-            # Kiểm tra các nhánh ELIF
-            num_expressions = len(ctx.expression()) # Tổng số biểu thức (if + elif)
-            # Số lượng elif là số biểu thức trừ đi 1 (cho if)
-            num_elifs = num_expressions - 1
+            num_elifs = len(ctx.expression()) - 1
             
             for i in range(num_elifs):
                 # Index của expression/statement cho elif bắt đầu từ 1
@@ -765,9 +760,6 @@ class Interpreter(OnionVisitor):
                     # Nếu điều kiện ELIF đúng, thực thi statement tương ứng
                     return self.visit(ctx.statement(elif_idx))
             
-            # Nếu không có IF/ELIF nào đúng, kiểm tra ELSE
-            # Statement của ELSE (nếu có) sẽ là statement cuối cùng
-            # Số lượng statements = 1 (if) + num_elifs + 1 (else, nếu có)
             num_statements = len(ctx.statement())
             if num_statements > num_elifs + 1: # Có nhánh else
                  else_stmt_index = num_statements - 1
