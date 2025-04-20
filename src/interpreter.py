@@ -119,7 +119,6 @@ class Interpreter(OnionVisitor):
         try:
             value = self.visit(ctx.expression())
             print(value)
-            # Trả về None thay vì value để tránh in kép
             return None
         except Exception as e:
             # Xử lý các lỗi khác
@@ -246,7 +245,8 @@ class Interpreter(OnionVisitor):
                 result = self.env.resolve(var_name)
                 return result
             except NameError as e:
-                return e
+                # If an identifier is used as an expression but not found, raise the error immediately
+                raise e 
         elif ctx.compoundExpr():
             # Xử lý biểu thức lồng nhau trong ngoặc đơn: '(' compoundExpr ')'
             return self.visit(ctx.compoundExpr())
@@ -353,18 +353,13 @@ class Interpreter(OnionVisitor):
 
         try:
             if operation == 'head' or operation == 'tail' or operation == 'sizeof':
-                # Grammar: op expression
+                # resolves expression
                 if ctx.expression() and len(ctx.expression()) > 0:
                     expr_ctx = ctx.expression(0)
                     lst = self.visit(expr_ctx)
-                # Fallback or alternative handling might be needed if IDENTIFIER is a separate path
-                # depending on exact ANTLR parse tree structure for 'expression | IDENTIFIER' 
-                # but grammar now uses just 'expression' which covers IDENTIFIER.
                 else:
-                     # Attempt to resolve as identifier if direct expression visit fails or is not present
-                     # This assumes the argument might be just an identifier text not parsed as expression rule
-                     # This part might be less robust than relying solely on ctx.expression(0)
-                     var_name = ctx.getChild(1).getText() # Less specific than ctx.IDENTIFIER()
+                     # resolves ID
+                     var_name = ctx.getChild(1).getText() 
                      try:
                          lst = self.env.resolve(var_name)
                      except Exception as resolve_err:
@@ -744,3 +739,39 @@ class Interpreter(OnionVisitor):
                 
         # Kiểm tra nếu kết quả là ReturnValue từ bên trong block
         return result
+
+    def visitIfExpr(self, ctx):
+        """Xử lý biểu thức if-elif-else"""
+        # Lấy điều kiện IF ban đầu
+        if_condition = ctx.expression(0)
+        if_value = self.visit(if_condition)
+
+        if if_value:
+            # Nếu điều kiện IF đúng, thực thi statement của IF
+            return self.visit(ctx.statement(0))
+        else:
+            # Kiểm tra các nhánh ELIF
+            num_expressions = len(ctx.expression()) # Tổng số biểu thức (if + elif)
+            # Số lượng elif là số biểu thức trừ đi 1 (cho if)
+            num_elifs = num_expressions - 1
+            
+            for i in range(num_elifs):
+                # Index của expression/statement cho elif bắt đầu từ 1
+                elif_idx = i + 1
+                elif_condition = ctx.expression(elif_idx)
+                elif_value = self.visit(elif_condition)
+                
+                if elif_value:
+                    # Nếu điều kiện ELIF đúng, thực thi statement tương ứng
+                    return self.visit(ctx.statement(elif_idx))
+            
+            # Nếu không có IF/ELIF nào đúng, kiểm tra ELSE
+            # Statement của ELSE (nếu có) sẽ là statement cuối cùng
+            # Số lượng statements = 1 (if) + num_elifs + 1 (else, nếu có)
+            num_statements = len(ctx.statement())
+            if num_statements > num_elifs + 1: # Có nhánh else
+                 else_stmt_index = num_statements - 1
+                 return self.visit(ctx.statement(else_stmt_index))
+            else:
+                 # Không có nhánh nào được thực thi
+                 return None
