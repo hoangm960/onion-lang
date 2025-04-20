@@ -20,12 +20,12 @@ statementType:
 	| returnStmt
 	| block
 	| functionCall
-	| ifExpr // allow if as a top-level statement
-	| branchExpr ; // allow cond as a top-level statement
+	| ifExpr
+	| branchExpr;
 
 incDecStmt:
 	'inc' IDENTIFIER // Increment: (inc x)
-	| 'dec' IDENTIFIER ; // Decrement: (dec x)
+	| 'dec' IDENTIFIER; // Decrement: (dec x)
 
 assignment:
 	'let' IDENTIFIER expression
