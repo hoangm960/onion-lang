@@ -833,7 +833,7 @@ class Interpreter(OnionVisitor):
     def visitMacroCall(self, ctx):
         macro_name = ctx.IDENTIFIER().getText()
 
-        if macro_name not in self.macros:
+        if macro_name not in self.functions:
             raise NameError(f"Macro '{macro_name}' is not defined")
 
         macro_def = self.macros[macro_name]
