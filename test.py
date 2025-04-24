@@ -3,19 +3,23 @@ from src.interpreter import Interpreter
 from src.parser import Parser
 import unittest
 import sys
+import os
+
+TEST_DIR = "./tests/semantics"
 
 
-class TestOnionLanguage(unittest.TestCase):
-    def setUp(self):
-        self.interpreter = Interpreter()
+class FileTestCase(unittest.TestCase):
+    def __init__(self, file_path) -> None:
+        super().__init__()
+        self.file_path = file_path
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}:{os.path.basename(self.file_path)}"
+
+
+class SemanticTest(FileTestCase):
 
     def capture_output(self, code: str):
-        """
-        Helper to parse the given Onion code, run the visitor,
-        and capture printed output along with the visitor's return value.
-        """
-        # Lexing & parsing
-
         parser = Parser()
         tree = parser.parse_input(code)
         old_stdout = sys.stdout
@@ -24,152 +28,54 @@ class TestOnionLanguage(unittest.TestCase):
             try:
                 result = self.interpreter.visit(tree)
                 output = sys.stdout.getvalue().strip()
-                return result, output
+                return output
             finally:
                 sys.stdout = old_stdout
+        return None
 
     def assertOnionOutput(self, code, expected_lines):
-        _, output = self.capture_output(code)
-        actual_lines = output.strip().split('\n')
-        self.assertEqual(actual_lines, expected_lines)
-
-    def test_arithmetic(self):
-        code = """
-        (print (+ 1 2 3))
-        (print (- 10 4))
-        (print (* 2 3 4))
-        (print (/ 20 5))
-        """
-        self.assertOnionOutput(code, ["6", "6", "24", "4.0"])
-
-    def test_booleans(self):
-        code = """
-        (print (== 5 5))
-        (print (!= 5 3))
-        (print (< 2 3))
-        (print (>= 7 7))
-        (print (not false))
-        """
-        self.assertOnionOutput(code, ["True", "True", "True", "True", "True"])
-
-    def test_assignment_and_inc_dec(self):
-        code = """
-        (let x 10)
-        (inc x)
-        (print x)
-        (dec x)
-        (print x)
-        """
-        self.assertOnionOutput(code, ["11", "10"])
-
-    def test_lists(self):
-        code = """
-        (let lst (list 1 2 3 4))
-        (print (head lst))
-        (print (tail lst))
-        (print (getid 2 lst))
-        (print (sizeof lst))
-        """
-        self.assertOnionOutput(code, ["1", "[2, 3, 4]", "3", "4"])
-
-    def test_plain_if_true(self):
-        code = """
-        (if (> 2 1) (print "A"))
-        """
-        self.assertOnionOutput(code, ['A'])
-
-    def test_plain_if_false(self):
-        code = """
-        (if (< 2 1) (print "A"))
-        """
-        self.assertOnionOutput(code, [''])
-
-    def test_if_elif_else(self):
-        code = '''
-        (if (== 1 2)
-            (print "A")
-            (elif (> 2 1) (print "B"))
-            (else (print "C"))
+        filename = os.path.basename(self.file_path)
+        OUTPUT_DIR = os.path.join(
+            TEST_DIR,
+            "output",
         )
-        '''
-        self.assertOnionOutput(code, ['B'])
+        if not os.path.exists(OUTPUT_DIR):
+            os.makedirs(OUTPUT_DIR)
+        OUTPUT_FILE_PATH = os.path.join(OUTPUT_DIR, filename)
 
-    def test_if_else_only(self):
-        code = '''
-        (if false
-            (print "no")
-            (else (print "yes"))
-        )
-        '''
-        self.assertOnionOutput(code, ['yes'])
+        output = self.capture_output(code)
+        if output:
+            output = output.strip()
+            with open(OUTPUT_FILE_PATH, "w") as fout:
+                fout.write(output)
+            self.assertEqual(output, expected_lines.strip())
 
-    def test_if_elif_only(self):
-        code = '''
-        (if false
-            (print "first")
-            (elif false (print "second"))
-            (elif true  (print "third"))
-        )
-        '''
-        self.assertOnionOutput(code, ['third'])
+    def setUp(self):
+        self.interpreter = Interpreter()
 
-    def test_cond(self):
-        code = """
-        (cond
-            ((< 1 0)
-                (print "branch1")
-            )
-            ((> 2 3)
-                (print "branch2")
-            )
-            (t
-                (print "default")
-            )
-        )
-        """
-        self.assertOnionOutput(code, ["default"])
+    def runTest(self):
+        test_data = None
+        with open(self.file_path) as fin:
+            test_data = fin.read()
 
-    def test_loops(self):
-        code = """
-        (let i 0)
-        (while (< i 3)
-            (print i)
-            (inc i)
-        )
-        (let count 0)
-        (repeat 4
-            (inc count)
-        )
-        (print count)
-        """
-        self.assertOnionOutput(code, ["0", "1", "2", "4"])
+        if not test_data:
+            raise Exception("File empty")
+        code, expectedOutput = test_data.split("\n\n")
+        self.assertOnionOutput(code, expectedOutput)
 
-    def test_functions(self):
-        code = """
-        (def add (a b)
-            (return (+ a b))
-        )
-        (print (add 2 3))
 
-        (def fact (n)
-            (if (<= n 1)
-                (return 1)
-                (else (return (* n (fact (- n 1)))))
-            )
-        )
-        (print (fact 5))
-        """
-        self.assertOnionOutput(code, ["5", "120"])
+def get_suite():
+    suite = unittest.TestSuite()
+    INPUT_FILE_PATH = os.path.join(TEST_DIR, "input")
 
-    def test_macros(self):
-        code = """
-        (macro double (x)
-            (print (* x 2))
-        )
-        (double 7)
-        """
-        self.assertOnionOutput(code, ["14"])
+    for file in os.listdir(INPUT_FILE_PATH):
+        file_path = os.path.join(INPUT_FILE_PATH, file)
+
+        if file.endswith(".onion"):
+            suite.addTest(SemanticTest(file_path))
+
+    return suite
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.TextTestRunner().run(get_suite())
