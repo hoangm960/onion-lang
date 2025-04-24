@@ -2,6 +2,7 @@ from generated.OnionVisitor import OnionVisitor
 from generated.OnionParser import OnionParser
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -46,6 +47,7 @@ class SymbolTable:
 class Interpreter(OnionVisitor):
     def __init__(self):
         self.env = SymbolTable()
+        self.functions = {}  # Lưu trữ các định nghĩa hàm
         self.macros = {}  # Lưu trữ các định nghĩa hàm
 
     def visitProgram(self, ctx):
@@ -54,12 +56,16 @@ class Interpreter(OnionVisitor):
             result = self.visit(stmt)
 
             # Kiểm tra xem nếu có lỗi không tìm thấy hàm, thử coi như đó là lời gọi hàm
-            if isinstance(result, Exception) and isinstance(result, NameError) and "' is not defined" in str(result):
+            if (
+                isinstance(result, Exception)
+                and isinstance(result, NameError)
+                and "' is not defined" in str(result)
+            ):
                 # Tách tên từ thông báo lỗi
                 var_name = str(result).split("'")[1]
 
                 # Kiểm tra xem có phải là tên hàm không
-                if var_name in self.macros:
+                if var_name in self.functions:
                     # Đây là lời gọi hàm không tham số
                     try:
                         # Tạo môi trường mới
@@ -72,7 +78,7 @@ class Interpreter(OnionVisitor):
                         self.env = function_env
 
                         # Lấy thân hàm từ định nghĩa hàm
-                        body = self.macros[var_name]['body']
+                        body = self.functions[var_name]["body"]
 
                         # Thực thi thân hàm
                         call_result = None
@@ -144,7 +150,7 @@ class Interpreter(OnionVisitor):
             # Bắt đầu từ vị trí 1 (sau 'let')
             i = 1
             while i < ctx.getChildCount():
-                if ctx.getChild(i).getText() == '(':
+                if ctx.getChild(i).getText() == "(":
                     # Mỗi cặp biến-giá trị có dạng '(' IDENTIFIER expression ')'
                     pair = ctx.getChild(i)
                     if pair.getChildCount() == 4:  # '(', IDENTIFIER, expression, ')'
@@ -279,18 +285,17 @@ class Interpreter(OnionVisitor):
     def visitArithmeticExpr(self, ctx):
         op = ctx.getChild(0).getText()
 
-        if op == '+':
+        if op == "+":
             # Addition: Sum all child expressions
             result = 0
             for i in range(1, ctx.getChildCount()):
                 child = ctx.getChild(i)
                 value = self.visit(child)
                 if value is None:
-                    raise ValueError(
-                        f"Cannot evaluate expression at position {i}")
+                    raise ValueError(f"Cannot evaluate expression at position {i}")
                 result += value
             return result
-        elif op == '-':
+        elif op == "-":
             # Subtraction: only 2 operands
             if ctx.getChildCount() != 3:
                 raise SyntaxError("Subtraction requires exactly 2 operands")
@@ -299,18 +304,17 @@ class Interpreter(OnionVisitor):
             if left is None or right is None:
                 raise ValueError("Cannot evaluate subtraction operands")
             return left - right
-        elif op == '*':
+        elif op == "*":
             # Multiplication: multiply all child expressions
             result = 1
             for i in range(1, ctx.getChildCount()):
                 child = ctx.getChild(i)
                 value = self.visit(child)
                 if value is None:
-                    raise ValueError(
-                        f"Cannot evaluate expression at position {i}")
+                    raise ValueError(f"Cannot evaluate expression at position {i}")
                 result *= value
             return result
-        elif op == '/':
+        elif op == "/":
             # Division: only 2 operands
             if ctx.getChildCount() != 3:
                 raise SyntaxError("Division requires exactly 2 operands")
@@ -331,6 +335,7 @@ class Interpreter(OnionVisitor):
             if right == 0:
                 raise ZeroDivisionError("Division by zero")
             return left // right
+
         return None
 
     def visitListExpr(self, ctx):
@@ -343,8 +348,7 @@ class Interpreter(OnionVisitor):
             child_value = self.visit(child)
 
             if child_value is None:
-                raise ValueError(
-                    f"Cannot evaluate list element at position {i}")
+                raise ValueError(f"Cannot evaluate list element at position {i}")
 
             result.append(child_value)
         return result
@@ -359,7 +363,7 @@ class Interpreter(OnionVisitor):
             return text[1:-1]
         elif ctx.BOOL():
             token = ctx.BOOL().getText()
-            return token == 'true'
+            return token == "true"
         return None
 
     def visitListOpExpr(self, ctx):
@@ -368,7 +372,7 @@ class Interpreter(OnionVisitor):
         index = None
 
         try:
-            if operation == 'head' or operation == 'tail' or operation == 'sizeof':
+            if operation == "head" or operation == "tail" or operation == "sizeof":
                 # resolves expression
                 if ctx.expression() and len(ctx.expression()) > 0:
                     expr_ctx = ctx.expression(0)
@@ -380,22 +384,24 @@ class Interpreter(OnionVisitor):
                         lst = self.env.resolve(var_name)
                     except Exception as resolve_err:
                         print(
-                            f"DEBUG ListOp: Failed to resolve potential identifier {var_name}: {resolve_err}")
-                        raise NameError(
-                            f"Variable '{var_name}' is not defined")
+                            f"DEBUG ListOp: Failed to resolve potential identifier {var_name}: {resolve_err}"
+                        )
+                        raise NameError(f"Variable '{var_name}' is not defined")
 
-            elif operation == 'getid':
+            elif operation == "getid":
                 # Grammar: 'getid' expression expression
                 if not ctx.expression() or len(ctx.expression()) < 2:
                     raise ValueError(
-                        "getid requires an index expression and a list expression")
+                        "getid requires an index expression and a list expression"
+                    )
 
                 # Get index (first expression)
                 index_expr_ctx = ctx.expression(0)
                 index = self.visit(index_expr_ctx)
                 if not isinstance(index, int):
                     raise TypeError(
-                        f"Index must be an integer, got {type(index).__name__}")
+                        f"Index must be an integer, got {type(index).__name__}"
+                    )
 
                 # Get list (second expression)
                 list_expr_ctx = ctx.expression(1)
@@ -404,28 +410,27 @@ class Interpreter(OnionVisitor):
         except Exception as e:
             # Log the original error for clarity
             # print(f"DEBUG ListOp: Caught exception during argument evaluation: {e}")
-            raise ValueError(
-                f"Error evaluating {operation} expression: {str(e)}")
+            raise ValueError(f"Error evaluating {operation} expression: {str(e)}")
 
         # Kiểm tra và thực hiện thao tác
         if lst is not None:
             if not isinstance(lst, list):
-                raise TypeError(
-                    f"Expected a list but got {type(lst).__name__}")
+                raise TypeError(f"Expected a list but got {type(lst).__name__}")
 
-            if not lst and operation != 'sizeof':
+            if not lst and operation != "sizeof":
                 raise ValueError(f"Cannot perform {operation} on empty list")
 
-            if operation == 'head':
+            if operation == "head":
                 return lst[0]
-            elif operation == 'tail':
+            elif operation == "tail":
                 return lst[1:]
-            elif operation == 'getid':
+            elif operation == "getid":
                 if index < 0 or index >= len(lst):
                     raise IndexError(
-                        f"Index {index} out of range for list of length {len(lst)}")
+                        f"Index {index} out of range for list of length {len(lst)}"
+                    )
                 return lst[index]
-            elif operation == 'sizeof':
+            elif operation == "sizeof":
                 return len(lst)
 
         raise ValueError(f"Could not evaluate list expression for {operation}")
@@ -461,7 +466,7 @@ class Interpreter(OnionVisitor):
         # Xác định loại vòng lặp
         first_token = ctx.getChild(0).getText()
 
-        if first_token == 'repeat':
+        if first_token == "repeat":
             # Vòng lặp repeat: (repeat expression block)
             count = self.visit(ctx.expression(0))
             if not isinstance(count, int):
@@ -481,7 +486,7 @@ class Interpreter(OnionVisitor):
                     result = self.visit(block_node)
             return result
 
-        elif first_token == 'loop':
+        elif first_token == "loop":
             # Vòng lặp loop: (loop IDENTIFIER range (start end step?) block)
             var_name = ctx.IDENTIFIER().getText()
             start = self.visit(ctx.expression(0))
@@ -507,7 +512,7 @@ class Interpreter(OnionVisitor):
                 current += step
             return result
 
-        elif first_token == 'while':
+        elif first_token == "while":
             # Vòng lặp while: (while expression block)
             result = None
 
@@ -535,37 +540,37 @@ class Interpreter(OnionVisitor):
     def visitBooleanExpr(self, ctx):
         op = ctx.getChild(0).getText()
 
-        if op == '==':
+        if op == "==":
             # So sánh bằng: (== expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left == right
-        elif op == '!=':
+        elif op == "!=":
             # So sánh khác: (!= expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left != right
-        elif op == '<':
+        elif op == "<":
             # So sánh nhỏ hơn: (< expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left < right
-        elif op == '>':
+        elif op == ">":
             # So sánh lớn hơn: (> expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left > right
-        elif op == '<=':
+        elif op == "<=":
             # So sánh nhỏ hơn hoặc bằng: (<= expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left <= right
-        elif op == '>=':
+        elif op == ">=":
             # So sánh lớn hơn hoặc bằng: (>= expr1 expr2)
             left = self.visit(ctx.expression(0))
             right = self.visit(ctx.expression(1))
             return left >= right
-        elif op == 'not':
+        elif op == "not":
             # Phủ định: (not expr)
             value = self.visit(ctx.expression(0))
             return not value
@@ -590,10 +595,7 @@ class Interpreter(OnionVisitor):
             block_node = ctx.block()
 
             # Lưu trữ thông tin hàm
-            self.macros[function_name] = {
-                'params': params,
-                'body': block_node
-            }
+            self.functions[function_name] = {"params": params, "body": block_node}
 
         return None  # Định nghĩa hàm không trả về giá trị
 
@@ -602,13 +604,13 @@ class Interpreter(OnionVisitor):
         # Lấy tên hàm từ IDENTIFIER
         function_name = ctx.IDENTIFIER().getText()
 
-        if function_name not in self.macros:
+        if function_name not in self.functions:
             raise NameError(f"Function '{function_name}' is not defined")
 
         # Lấy định nghĩa hàm
-        function_def = self.macros[function_name]
-        params = function_def['params']
-        body = function_def['body']
+        function_def = self.functions[function_name]
+        params = function_def["params"]
+        body = function_def["body"]
 
         # Đánh giá các đối số
         args = []
@@ -629,7 +631,8 @@ class Interpreter(OnionVisitor):
         # Kiểm tra số lượng đối số
         if len(args) != len(params):
             raise ValueError(
-                f"Function '{function_name}' expected {len(params)} arguments, got {len(args)}")
+                f"Function '{function_name}' expected {len(params)} arguments, got {len(args)}"
+            )
 
         # Lưu trữ phạm vi biến hiện tại
         previous_env = self.env
@@ -638,10 +641,10 @@ class Interpreter(OnionVisitor):
         function_env = SymbolTable(previous_env)
 
         # Nếu là hàm factorial, thêm sẵn các biến khai báo trong thân hàm
-        if function_name == 'factorial':
-            function_env.define('n', args[0])
-            function_env.define('result', 1)
-            function_env.define('i', 1)
+        if function_name == "factorial":
+            function_env.define("n", args[0])
+            function_env.define("result", 1)
+            function_env.define("i", 1)
             self.env = function_env
 
             # Bỏ qua 2 khai báo đầu tiên và chỉ thực thi phần còn lại
@@ -683,7 +686,11 @@ class Interpreter(OnionVisitor):
                         elif stmt_result is not None:
                             result = stmt_result
 
-                    if result is None and 'stmt_result' in locals() and isinstance(stmt_result, ReturnValue):
+                    if (
+                        result is None
+                        and "stmt_result" in locals()
+                        and isinstance(stmt_result, ReturnValue)
+                    ):
                         result = stmt_result.value
 
                 except Exception as e:
@@ -704,12 +711,13 @@ class Interpreter(OnionVisitor):
 
         if not isinstance(current_value, (int, float)):
             raise TypeError(
-                f"Cannot increment/decrement non-numeric value: {current_value}")
+                f"Cannot increment/decrement non-numeric value: {current_value}"
+            )
 
-        if op == 'inc':
+        if op == "inc":
             # Tăng biến lên 1: (inc x)
             new_value = current_value + 1
-        elif op == 'dec':
+        elif op == "dec":
             # Giảm biến đi 1: (dec x)
             new_value = current_value - 1
 
@@ -818,10 +826,7 @@ class Interpreter(OnionVisitor):
 
             block_node = ctx.block()
 
-            self.macros[macro_name] = {
-                'params': params,
-                'body': block_node
-            }
+            self.macros[macro_name] = {"params": params, "body": block_node}
 
         return None
 
@@ -832,8 +837,8 @@ class Interpreter(OnionVisitor):
             raise NameError(f"Macro '{macro_name}' is not defined")
 
         macro_def = self.macros[macro_name]
-        params = macro_def['params']
-        body = macro_def['body']
+        params = macro_def["params"]
+        body = macro_def["body"]
 
         args = []
         for expr in ctx.expression():
@@ -841,7 +846,9 @@ class Interpreter(OnionVisitor):
             args.append(arg_value)
 
         if len(args) != len(params):
-            raise ValueError(f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}")
+            raise ValueError(
+                f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}"
+            )
 
         previous_env = self.env
         macro_env = SymbolTable(previous_env)
@@ -864,3 +871,4 @@ class Interpreter(OnionVisitor):
             self.env = previous_env
 
         return result
+
