@@ -47,7 +47,8 @@ arithmeticExpr:
 	'+' expression+
 	| '-' expression expression
 	| '*' expression+
-	| '/' expression expression;
+	| '/' expression expression
+	| '//' expression expression;
 
 booleanExpr:
 	'==' expression expression
@@ -115,8 +116,8 @@ literal: INT | FLOAT | BOOL | STRING;
 BOOL: 'true' | 'false';
 
 // Literals
-INT: [0-9]+;
-FLOAT: [0-9]* '.' [0-9]+;
+INT: '-'? [0-9]+;
+FLOAT: '-'? [0-9]* '.' [0-9]+;
 STRING: '"' (~["\r\n])*? '"';
 
 // Identifier (comes AFTER specific keywords like BOOL)
@@ -125,4 +126,4 @@ IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 // Skip whitespace and comments
 WS: [ \t\r\n]+ -> skip;
 COMMENT: '/*' .*? '*/' -> skip; // Non-greedy match
-LINE_COMMENT: '//' ~[\r\n]* -> skip;
+LINE_COMMENT: '#' ~[\r\n]* -> skip;

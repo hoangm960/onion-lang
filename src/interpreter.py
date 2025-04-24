@@ -321,6 +321,16 @@ class Interpreter(OnionVisitor):
             if right == 0:
                 raise ZeroDivisionError("Division by zero")
             return left / right
+        elif op == "//":
+            if ctx.getChildCount() != 3:
+                raise SyntaxError("Integer division requires exactly 2 operands")
+            left = self.visit(ctx.getChild(1))
+            right = self.visit(ctx.getChild(2))
+            if left is None or right is None:
+                raise ValueError("Cannot evaluate integer division operands")
+            if right == 0:
+                raise ZeroDivisionError("Division by zero")
+            return left // right
         return None
 
     def visitListExpr(self, ctx):
