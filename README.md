@@ -11,30 +11,31 @@
 ## Folder Structure
 ```bash
 onion-lang/
-├── README.md       
-├── requirements.txt          
-├── grammar/          
-│   └── Onion.g4 
-├── generated/             # Generated parser files from ANTLR4
+├── grammar/
+│   └── Onion.g4
+├── generated/           # Generated parser files from ANTLR4
 │   ├── __init__.py
-│   ├── ...
 │   ├── OnionLexer.py
 │   ├── OnionParser.py
 │   └── OnionVisitor.py
-├── src/                   # Main source code
+├── src/                 # Main source code
 │   ├── __init__.py
-│   ├── parser.py          # Module to load parser
-│   ├── interpreter.py     # Module for interpreter
-│   ├── repl.py            # Read-Evaluate-Print Loop
+│   ├── parser.py        # Module to load parser
+│   ├── interpreter.py   # Module for interpreter
+│   ├── repl.py          # Read-Evaluate-Print Loop
 │   └── utils.py
-└── tests/
-    └── parsers/    
-        ├── input/
-        │   ├── input1.onion  
-        │   └── input2.onion
-        └── output/
-            ├── output1.onion
-            └── output2.onion
+├── tests/
+│   └── parsers/
+│       ├── input/
+│       │   ├── input1.onion
+│       │   └── input2.onion
+│       └── output/
+│           ├── output1.onion
+│           └── output2.onion
+├── main.py              # Main file to run repl
+├── test.py              # Unittest
+├── README.md
+└── requirements.txt
 ```
 ## Grammar
 ### Test grammar
