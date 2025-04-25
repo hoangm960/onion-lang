@@ -2,6 +2,13 @@ from generated.OnionVisitor import OnionVisitor
 from generated.OnionParser import OnionParser
 import sys
 import os
+from src.symbol_table import SymbolTable
+from src.exceptions import (
+    OnionRuntimeError,
+    OnionNameError,
+    OnionArgumentError,
+    OnionTypeError,
+)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,38 +20,7 @@ class ReturnValue:
         self.value = value
 
 
-class SymbolTable:
-    """Bảng ký hiệu phân cấp để quản lý phạm vi biến."""
-
-    def __init__(self, parent=None):
-        self.symbols = {}  # lưu trữ biến ở phạm vi hiện tại
-        self.parent = parent  # bảng ký hiệu phạm vi cha
-
-    def define(self, name, value):
-        """Định nghĩa một biến trong phạm vi hiện tại."""
-        self.symbols[name] = value
-
-    def resolve(self, name):
-        """Tìm giá trị của biến trong các phạm vi lồng nhau."""
-        if name in self.symbols:
-            return self.symbols[name]
-        elif self.parent:
-            return self.parent.resolve(name)
-        else:
-            raise NameError(f"Variable '{name}' is not defined")
-
-    def assign(self, name, value):
-        """Gán giá trị cho biến đã tồn tại."""
-        if name in self.symbols:
-            self.symbols[name] = value
-            return True
-        elif self.parent:
-            return self.parent.assign(name, value)
-        else:
-            return False
-
-
-class Interpreter(OnionVisitor):
+class BaseInterpreter(OnionVisitor):
     def __init__(self):
         self.env = SymbolTable()
         self.functions = {}  # Lưu trữ các định nghĩa hàm
@@ -161,6 +137,107 @@ class Interpreter(OnionVisitor):
                 i += 1
             return result
 
+    def visitChildren(self, ctx):
+        # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể
+        result = None
+        for i in range(ctx.getChildCount()):
+            child = ctx.getChild(i)
+            if child:
+                child_result = self.visit(child)
+                if child_result is not None:
+                    result = child_result
+        return result
+
+    def visitBlock(self, ctx):
+        """Xử lý block các câu lệnh"""
+        result = None
+
+        # Duyệt qua tất cả các statement trong block
+        for i in range(ctx.getChildCount()):
+            stmt = ctx.getChild(i)
+            result = self.visit(stmt)
+
+            # Kiểm tra nếu kết quả là ReturnValue
+            if isinstance(result, ReturnValue):
+                # Gặp lệnh return, dừng việc xử lý block và trả về đối tượng ReturnValue
+                return result
+
+        return result
+
+    def visitIncDecStmt(self, ctx):
+        """Xử lý tăng/giảm biến"""
+        op = ctx.getChild(0).getText()
+        var_name = ctx.IDENTIFIER().getText()
+
+        # Lấy giá trị hiện tại
+        current_value = self.env.resolve(var_name)
+
+        if not isinstance(current_value, (int, float)):
+            raise TypeError(
+                f"Cannot increment/decrement non-numeric value: {current_value}"
+            )
+
+        if op == "inc":
+            # Tăng biến lên 1: (inc x)
+            new_value = current_value + 1
+        elif op == "dec":
+            # Giảm biến đi 1: (dec x)
+            new_value = current_value - 1
+
+        # Cập nhật giá trị mới
+        if not self.env.assign(var_name, new_value):
+            raise NameError(f"Variable '{var_name}' is not defined")
+
+        return new_value
+
+    def visitReturnStmt(self, ctx):
+        """Xử lý lệnh return trong hàm"""
+        # Lấy trực tiếp biểu thức sau từ khóa 'return'
+        if ctx.getChildCount() > 1:
+            expr = ctx.getChild(1)  # Phần tử thứ 2 (index 1) sau 'return'
+
+            value = self.visit(expr)
+
+            # Đánh dấu đây là giá trị return
+            return_value = ReturnValue(value)
+            return return_value
+
+        # Nếu không có biểu thức, trả về None
+        return ReturnValue(None)
+
+    def execute_block(self, statements, environment):
+        """Thực thi khối lệnh với môi trường cục bộ mới."""
+        previous = self.env
+        try:
+            self.env = environment
+            result = None
+            for statement in statements:
+                result = self.visit(statement)
+                if isinstance(result, ReturnValue):
+                    break
+            return result
+        finally:
+            self.env = previous
+
+    def visitConditionalStmt(self, ctx):
+        # Xử lý câu lệnh điều kiện: (if condition then-block [else else-block])
+        condition_result = self.visit(ctx.expression())
+
+        if condition_result:
+            # Thực thi khối then
+            result = self.visit(ctx.block(0))
+        else:
+            # Nếu có khối else, thực thi nó
+            if ctx.block(1) is not None:
+                result = self.visit(ctx.block(1))
+            else:
+                result = None
+
+        # Kiểm tra nếu kết quả là ReturnValue từ bên trong block
+        return result
+
+
+class ExpressionVisitor(BaseInterpreter):
     def visitExpression(self, ctx):
         # Check các loại cụ thể của expression
         if ctx.literal():
@@ -195,6 +272,19 @@ class Interpreter(OnionVisitor):
             return self.visit(ctx.branchExpr())
         elif ctx.listOpExpr():
             return self.visit(ctx.listOpExpr())
+        return None
+
+    def visitLiteral(self, ctx):
+        if ctx.INT():
+            return int(ctx.INT().getText())
+        elif ctx.FLOAT():
+            return float(ctx.FLOAT().getText())
+        elif ctx.STRING():
+            text = ctx.STRING().getText()
+            return text[1:-1]
+        elif ctx.BOOL():
+            token = ctx.BOOL().getText()
+            return token == "true"
         return None
 
     def visitArithmeticExpr(self, ctx):
@@ -263,6 +353,48 @@ class Interpreter(OnionVisitor):
 
         return None
 
+    def visitBooleanExpr(self, ctx):
+        op = ctx.getChild(0).getText()
+
+        if op == "==":
+            # So sánh bằng: (== expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left == right
+        elif op == "!=":
+            # So sánh khác: (!= expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left != right
+        elif op == "<":
+            # So sánh nhỏ hơn: (< expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left < right
+        elif op == ">":
+            # So sánh lớn hơn: (> expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left > right
+        elif op == "<=":
+            # So sánh nhỏ hơn hoặc bằng: (<= expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left <= right
+        elif op == ">=":
+            # So sánh lớn hơn hoặc bằng: (>= expr1 expr2)
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+            return left >= right
+        elif op == "not":
+            # Phủ định: (not expr)
+            value = self.visit(ctx.expression(0))
+            return not value
+
+        return None
+
+
+class ListVisitor(BaseInterpreter):
     def visitListExpr(self, ctx):
         # First child is 'list' keyword, skip it
         result = []
@@ -277,19 +409,6 @@ class Interpreter(OnionVisitor):
 
             result.append(child_value)
         return result
-
-    def visitLiteral(self, ctx):
-        if ctx.INT():
-            return int(ctx.INT().getText())
-        elif ctx.FLOAT():
-            return float(ctx.FLOAT().getText())
-        elif ctx.STRING():
-            text = ctx.STRING().getText()
-            return text[1:-1]
-        elif ctx.BOOL():
-            token = ctx.BOOL().getText()
-            return token == "true"
-        return None
 
     def visitListOpExpr(self, ctx):
         operation = ctx.getChild(0).getText()
@@ -360,33 +479,50 @@ class Interpreter(OnionVisitor):
 
         raise ValueError(f"Could not evaluate list expression for {operation}")
 
-    def visitChildren(self, ctx):
-        # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể
-        result = None
-        for i in range(ctx.getChildCount()):
-            child = ctx.getChild(i)
-            if child:
-                child_result = self.visit(child)
-                if child_result is not None:
-                    result = child_result
-        return result
 
-    def visitBlock(self, ctx):
-        """Xử lý block các câu lệnh"""
-        result = None
+class BranchVisitor(BaseInterpreter):
+    def visitIfExpr(self, ctx):
+        """Xử lý biểu thức if-elif-else"""
+        # First expression is the condition
+        if_value = self.visit(ctx.expression(0))
 
-        # Duyệt qua tất cả các statement trong block
-        for i in range(ctx.getChildCount()):
-            stmt = ctx.getChild(i)
-            result = self.visit(stmt)
+        if if_value:
+            return self.visit(ctx.statement(0))
+        else:
+            num_elifs = len(ctx.expression()) - 1
 
-            # Kiểm tra nếu kết quả là ReturnValue
-            if isinstance(result, ReturnValue):
-                # Gặp lệnh return, dừng việc xử lý block và trả về đối tượng ReturnValue
-                return result
+            for i in range(num_elifs):
+                # Index của expression/statement cho elif bắt đầu từ 1
+                elif_idx = i + 1
+                elif_condition = ctx.expression(elif_idx)
+                elif_value = self.visit(elif_condition)
 
-        return result
+                if elif_value:
+                    # Nếu điều kiện ELIF đúng, thực thi statement tương ứng
+                    return self.visit(ctx.statement(elif_idx))
 
+            num_statements = len(ctx.statement())
+            if num_statements > num_elifs + 1:  # Có nhánh else
+                else_stmt_index = num_statements - 1
+                return self.visit(ctx.statement(else_stmt_index))
+            else:
+                # Không có nhánh nào được thực thi
+                return None
+
+    def visitBranchExpr(self, ctx):
+        for i in range(len(ctx.expression())):
+            condition = self.visit(ctx.expression(i))
+            if condition:
+                return self.visit(ctx.statement(i))
+
+        if len(ctx.statement()) > len(ctx.expression()):
+            last_statement_index = len(ctx.statement()) - 1
+            return self.visit(ctx.statement(last_statement_index))
+
+        return None
+
+
+class LoopVisitor(BaseInterpreter):
     def visitLoopStatement(self, ctx):
         # Xác định loại vòng lặp
         first_token = ctx.getChild(0).getText()
@@ -437,7 +573,7 @@ class Interpreter(OnionVisitor):
                 self.env.define(var_name, current)
                 if block_node is not None:
                     result = self.visit(block_node)
-                
+
                 if isinstance(result, ReturnValue):
                     return result
                 current += step
@@ -470,46 +606,8 @@ class Interpreter(OnionVisitor):
 
         return None
 
-    def visitBooleanExpr(self, ctx):
-        op = ctx.getChild(0).getText()
 
-        if op == "==":
-            # So sánh bằng: (== expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left == right
-        elif op == "!=":
-            # So sánh khác: (!= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left != right
-        elif op == "<":
-            # So sánh nhỏ hơn: (< expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left < right
-        elif op == ">":
-            # So sánh lớn hơn: (> expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left > right
-        elif op == "<=":
-            # So sánh nhỏ hơn hoặc bằng: (<= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left <= right
-        elif op == ">=":
-            # So sánh lớn hơn hoặc bằng: (>= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left >= right
-        elif op == "not":
-            # Phủ định: (not expr)
-            value = self.visit(ctx.expression(0))
-            return not value
-
-        return None
-
+class FunctionVisitor(BaseInterpreter):
     def visitFunctionDef(self, ctx):
         """Xử lý định nghĩa hàm"""
         # Lấy tên hàm từ phần tử đầu tiên trong danh sách IDENTIFIER
@@ -532,11 +630,28 @@ class Interpreter(OnionVisitor):
 
         return None  # Định nghĩa hàm không trả về giá trị
 
+    def visitMacroDef(self, ctx):
+        identifiers = ctx.IDENTIFIER()
+
+        if len(identifiers) > 0:
+            macro_name = identifiers[0].getText()
+
+            params = []
+            for i in range(1, len(identifiers)):
+                param_name = identifiers[i].getText()
+                params.append(param_name)
+
+            block_node = ctx.block()
+
+            self.macros[macro_name] = {"params": params, "body": block_node}
+
+        return None
+
     def visitCallExpr(self, ctx):
         """Xử lý lời gọi hàm"""
         # Lấy tên hàm từ IDENTIFIER
         name = ctx.IDENTIFIER().getText()
-        
+
         if name in self.macros:
             return self.visitMacroCall(ctx)
 
@@ -668,135 +783,6 @@ class Interpreter(OnionVisitor):
 
             return result
 
-    def visitIncDecStmt(self, ctx):
-        """Xử lý tăng/giảm biến"""
-        op = ctx.getChild(0).getText()
-        var_name = ctx.IDENTIFIER().getText()
-
-        # Lấy giá trị hiện tại
-        current_value = self.env.resolve(var_name)
-
-        if not isinstance(current_value, (int, float)):
-            raise TypeError(
-                f"Cannot increment/decrement non-numeric value: {current_value}"
-            )
-
-        if op == "inc":
-            # Tăng biến lên 1: (inc x)
-            new_value = current_value + 1
-        elif op == "dec":
-            # Giảm biến đi 1: (dec x)
-            new_value = current_value - 1
-
-        # Cập nhật giá trị mới
-        if not self.env.assign(var_name, new_value):
-            raise NameError(f"Variable '{var_name}' is not defined")
-
-        return new_value
-
-    def visitReturnStmt(self, ctx):
-        """Xử lý lệnh return trong hàm"""
-        # Lấy trực tiếp biểu thức sau từ khóa 'return'
-        if ctx.getChildCount() > 1:
-            expr = ctx.getChild(1)  # Phần tử thứ 2 (index 1) sau 'return'
-
-            value = self.visit(expr)
-
-            # Đánh dấu đây là giá trị return
-            return_value = ReturnValue(value)
-            return return_value
-
-        # Nếu không có biểu thức, trả về None
-        return ReturnValue(None)
-
-    def execute_block(self, statements, environment):
-        """Thực thi khối lệnh với môi trường cục bộ mới."""
-        previous = self.env
-        try:
-            self.env = environment
-            result = None
-            for statement in statements:
-                result = self.visit(statement)
-                if isinstance(result, ReturnValue):
-                    break
-            return result
-        finally:
-            self.env = previous
-
-    def visitConditionalStmt(self, ctx):
-        # Xử lý câu lệnh điều kiện: (if condition then-block [else else-block])
-        condition_result = self.visit(ctx.expression())
-
-        if condition_result:
-            # Thực thi khối then
-            result = self.visit(ctx.block(0))
-        else:
-            # Nếu có khối else, thực thi nó
-            if ctx.block(1) is not None:
-                result = self.visit(ctx.block(1))
-            else:
-                result = None
-
-        # Kiểm tra nếu kết quả là ReturnValue từ bên trong block
-        return result
-
-    def visitIfExpr(self, ctx):
-        """Xử lý biểu thức if-elif-else"""
-        # First expression is the condition
-        if_value = self.visit(ctx.expression(0))
-
-        if if_value:
-            return self.visit(ctx.statement(0))
-        else:
-            num_elifs = len(ctx.expression()) - 1
-
-            for i in range(num_elifs):
-                # Index của expression/statement cho elif bắt đầu từ 1
-                elif_idx = i + 1
-                elif_condition = ctx.expression(elif_idx)
-                elif_value = self.visit(elif_condition)
-
-                if elif_value:
-                    # Nếu điều kiện ELIF đúng, thực thi statement tương ứng
-                    return self.visit(ctx.statement(elif_idx))
-
-            num_statements = len(ctx.statement())
-            if num_statements > num_elifs + 1:  # Có nhánh else
-                else_stmt_index = num_statements - 1
-                return self.visit(ctx.statement(else_stmt_index))
-            else:
-                # Không có nhánh nào được thực thi
-                return None
-
-    def visitBranchExpr(self, ctx):
-        for i in range(len(ctx.expression())):
-            condition = self.visit(ctx.expression(i))
-            if condition:
-                return self.visit(ctx.statement(i))
-
-        if len(ctx.statement()) > len(ctx.expression()):
-            last_statement_index = len(ctx.statement()) - 1
-            return self.visit(ctx.statement(last_statement_index))
-
-        return None
-
-    def visitMacroDef(self, ctx):
-        identifiers = ctx.IDENTIFIER()
-
-        if len(identifiers) > 0:
-            macro_name = identifiers[0].getText()
-
-            params = []
-            for i in range(1, len(identifiers)):
-                param_name = identifiers[i].getText()
-                params.append(param_name)
-
-            block_node = ctx.block()
-
-            self.macros[macro_name] = {"params": params, "body": block_node}
-
-        return None
-
     def visitMacroCall(self, ctx):
         macro_name = ctx.IDENTIFIER().getText()
 
@@ -838,3 +824,16 @@ class Interpreter(OnionVisitor):
             self.env = previous_env
 
         return result
+
+
+class Interpreter(
+    ExpressionVisitor, ListVisitor, BranchVisitor, LoopVisitor, FunctionVisitor
+):
+    def visit(self, tree):
+        """Override visit with error handling"""
+        try:
+            return super().visit(tree)
+        except OnionRuntimeError as e:
+            raise e
+        except Exception as e:
+            raise OnionRuntimeError(f"Runtime error: {str(e)}") from e
