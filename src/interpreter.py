@@ -9,6 +9,7 @@ from src.exceptions import (
     OnionArgumentError,
     OnionTypeError,
 )
+from src.builtins import BuiltInFunctions
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -30,50 +31,8 @@ class BaseInterpreter(OnionVisitor):
         result = None
         for stmt in ctx.statement():
             result = self.visit(stmt)
-
-            # Kiểm tra xem nếu có lỗi không tìm thấy hàm, thử coi như đó là lời gọi hàm
-            if (
-                isinstance(result, Exception)
-                and isinstance(result, NameError)
-                and "' is not defined" in str(result)
-            ):
-                # Tách tên từ thông báo lỗi
-                var_name = str(result).split("'")[1]
-
-                # Kiểm tra xem có phải là tên hàm không
-                if var_name in self.functions:
-                    # Đây là lời gọi hàm không tham số
-                    try:
-                        # Tạo môi trường mới
-                        function_env = SymbolTable(self.env)
-
-                        # Lưu môi trường hiện tại
-                        previous_env = self.env
-
-                        # Thiết lập môi trường mới
-                        self.env = function_env
-
-                        # Lấy thân hàm từ định nghĩa hàm
-                        body = self.functions[var_name]["body"]
-
-                        # Thực thi thân hàm
-                        call_result = None
-                        for i in range(body.getChildCount()):
-                            stmt_result = self.visit(body.getChild(i))
-                            if isinstance(stmt_result, ReturnValue):
-                                call_result = stmt_result.value
-                                break
-                            elif stmt_result is not None:
-                                call_result = stmt_result
-
-                        # Khôi phục môi trường
-                        self.env = previous_env
-
-                        # Gán lại result
-                        result = call_result
-                    except Exception as e:
-                        # Nếu có lỗi, giữ nguyên result là lỗi ban đầu
-                        pass
+            if isinstance(result, ReturnValue):
+                break
 
         return result
 
@@ -238,160 +197,185 @@ class BaseInterpreter(OnionVisitor):
 
 
 class ExpressionVisitor(BaseInterpreter):
+    def _resolve_identifier(self, ctx):
+        """Resolve variable identifier with error handling"""
+        var_name = ctx.IDENTIFIER().getText()
+        try:
+            return self.env.resolve(var_name)
+        except NameError as e:
+            if var_name in BuiltInFunctions.registry:
+                return BuiltInFunctions.execute(var_name, self, [])
+            raise OnionNameError(f"Undefined variable '{var_name}'") from e
+
     def visitExpression(self, ctx):
-        # Check các loại cụ thể của expression
         if ctx.literal():
             result = self.visit(ctx.literal())
             return result
         elif ctx.IDENTIFIER():
-            var_name = ctx.IDENTIFIER().getText()
-            try:
-                result = self.env.resolve(var_name)
-                return result
-            except NameError as e:
-                # If an identifier is used as an expression but not found, raise the error immediately
-                raise e
+            return self._resolve_identifier(ctx)
         elif ctx.compoundExpr():
-            # Xử lý biểu thức lồng nhau trong ngoặc đơn: '(' compoundExpr ')'
             return self.visit(ctx.compoundExpr())
         return None
 
     def visitCompoundExpr(self, ctx):
-        # Check các loại cụ thể của compoundExpr
         if ctx.arithmeticExpr():
             return self.visit(ctx.arithmeticExpr())
-        elif ctx.booleanExpr():
+        if ctx.booleanExpr():
             return self.visit(ctx.booleanExpr())
-        elif ctx.listExpr():
+        if ctx.listExpr():
             return self.visit(ctx.listExpr())
-        elif ctx.callExpr():
+        if ctx.callExpr():
             return self.visit(ctx.callExpr())
-        elif ctx.ifExpr():
+        if ctx.ifExpr():
             return self.visit(ctx.ifExpr())
-        elif ctx.branchExpr():
+        if ctx.branchExpr():
             return self.visit(ctx.branchExpr())
-        elif ctx.listOpExpr():
+        if ctx.listOpExpr():
             return self.visit(ctx.listOpExpr())
         return None
 
     def visitLiteral(self, ctx):
         if ctx.INT():
             return int(ctx.INT().getText())
-        elif ctx.FLOAT():
+        if ctx.FLOAT():
             return float(ctx.FLOAT().getText())
-        elif ctx.STRING():
+        if ctx.STRING():
             text = ctx.STRING().getText()
             return text[1:-1]
-        elif ctx.BOOL():
+        if ctx.BOOL():
             token = ctx.BOOL().getText()
             return token == "true"
         return None
 
+
+class ArithmeticVisitor(ExpressionVisitor):
     def visitArithmeticExpr(self, ctx):
         op = ctx.getChild(0).getText()
+        handlers = {
+            "+": self._handle_addition,
+            "-": self._handle_subtraction,
+            "*": self._handle_multiplication,
+            "/": self._handle_division,
+            "//": self._handle_integer_division,
+        }
+        return handlers[op](ctx)
 
+    def _handle_addition(self, ctx):
         # Addition and string concatenation
-        if op == "+":
-            result = self.visit(ctx.getChild(1))
-            for i in range(2, ctx.getChildCount()):
-                value = self.visit(ctx.getChild(i))
-                # If string then concat
-                if isinstance(result, str) and isinstance(value, str):
-                    result = result + value
-                # Else if number then add (can be int or float)
-                elif isinstance(result, (int, float)) and isinstance(
-                    value, (int, float)
-                ):
-                    result = result + value
-                # Else TypeError
-                else:
-                    raise TypeError(
-                        f"Cannot add values of type {type(result)} and {type(value)}"
-                    )
-            return result
+        result = self.visit(ctx.getChild(1))
+        for i in range(2, ctx.getChildCount()):
+            value = self.visit(ctx.getChild(i))
+            # If string then concat
+            if isinstance(result, str) and isinstance(value, str):
+                result = result + value
+            # Else if number then add (can be int or float)
+            elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
+                result = result + value
+            else:
+                raise TypeError(
+                    f"Cannot add values of type {type(result)} and {type(value)}"
+                )
+        return result
 
-        elif op == "-":
-            # Subtraction: only 2 operands
-            if ctx.getChildCount() != 3:
-                raise SyntaxError("Subtraction requires exactly 2 operands")
-            left = self.visit(ctx.getChild(1))
-            right = self.visit(ctx.getChild(2))
-            if left is None or right is None:
-                raise ValueError("Cannot evaluate subtraction operands")
-            return left - right
-        elif op == "*":
-            # Multiplication: multiply all child expressions
-            result = 1
-            for i in range(1, ctx.getChildCount()):
-                child = ctx.getChild(i)
-                value = self.visit(child)
-                if value is None:
-                    raise ValueError(f"Cannot evaluate expression at position {i}")
-                result *= value
-            return result
-        elif op == "/":
-            # Division: only 2 operands
-            if ctx.getChildCount() != 3:
-                raise SyntaxError("Division requires exactly 2 operands")
-            left = self.visit(ctx.getChild(1))
-            right = self.visit(ctx.getChild(2))
-            if left is None or right is None:
-                raise ValueError("Cannot evaluate division operands")
-            if right == 0:
-                raise ZeroDivisionError("Division by zero")
-            return left / right
-        elif op == "//":
-            if ctx.getChildCount() != 3:
-                raise SyntaxError("Integer division requires exactly 2 operands")
-            left = self.visit(ctx.getChild(1))
-            right = self.visit(ctx.getChild(2))
-            if left is None or right is None:
-                raise ValueError("Cannot evaluate integer division operands")
-            if right == 0:
-                raise ZeroDivisionError("Division by zero")
-            return left // right
+    def _handle_subtraction(self, ctx):
+        # Subtraction: only 2 operands
+        if ctx.getChildCount() != 3:
+            raise SyntaxError("Subtraction requires exactly 2 operands")
+        left = self.visit(ctx.getChild(1))
+        right = self.visit(ctx.getChild(2))
+        if left is None or right is None:
+            raise ValueError("Cannot evaluate subtraction operands")
+        return left - right
 
-        return None
+    def _handle_multiplication(self, ctx):
+        # Multiplication: multiply all child expressions
+        result = 1
+        for i in range(1, ctx.getChildCount()):
+            child = ctx.getChild(i)
+            value = self.visit(child)
+            if value is None:
+                raise ValueError(f"Cannot evaluate expression at position {i}")
+            result *= value
+        return result
 
+    def _handle_division(self, ctx):
+        # Division: only 2 operands
+        if ctx.getChildCount() != 3:
+            raise SyntaxError("Division requires exactly 2 operands")
+        left = self.visit(ctx.getChild(1))
+        right = self.visit(ctx.getChild(2))
+        if left is None or right is None:
+            raise ValueError("Cannot evaluate division operands")
+        if right == 0:
+            raise ZeroDivisionError("Division by zero")
+        return left / right
+
+    def _handle_integer_division(self, ctx):
+        if ctx.getChildCount() != 3:
+            raise SyntaxError("Integer division requires exactly 2 operands")
+        left = self.visit(ctx.getChild(1))
+        right = self.visit(ctx.getChild(2))
+        if left is None or right is None:
+            raise ValueError("Cannot evaluate integer division operands")
+        if right == 0:
+            raise ZeroDivisionError("Division by zero")
+        return left // right
+
+
+class BooleanVisitor(ExpressionVisitor):
     def visitBooleanExpr(self, ctx):
         op = ctx.getChild(0).getText()
+        handlers = {
+            "==": self._handle_equal,
+            "!=": self._handle_not_equal,
+            "<": self._handle_less,
+            ">": self._handle_greater,
+            "<=": self._handle_less_equal,
+            ">=": self._handle_greater_equal,
+            "not": self._handle_not,
+        }
+        return handlers[op](ctx)
 
-        if op == "==":
-            # So sánh bằng: (== expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left == right
-        elif op == "!=":
-            # So sánh khác: (!= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left != right
-        elif op == "<":
-            # So sánh nhỏ hơn: (< expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left < right
-        elif op == ">":
-            # So sánh lớn hơn: (> expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left > right
-        elif op == "<=":
-            # So sánh nhỏ hơn hoặc bằng: (<= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left <= right
-        elif op == ">=":
-            # So sánh lớn hơn hoặc bằng: (>= expr1 expr2)
-            left = self.visit(ctx.expression(0))
-            right = self.visit(ctx.expression(1))
-            return left >= right
-        elif op == "not":
-            # Phủ định: (not expr)
-            value = self.visit(ctx.expression(0))
-            return not value
+    def _handle_equal(self, ctx):
+        # So sánh bằng: (== expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left == right
 
-        return None
+    def _handle_not_equal(self, ctx):
+        # So sánh khác: (!= expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left != right
+
+    def _handle_less(self, ctx):
+        # So sánh nhỏ hơn: (< expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left < right
+
+    def _handle_greater(self, ctx):
+        # So sánh lớn hơn: (> expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left > right
+
+    def _handle_less_equal(self, ctx):
+        # So sánh nhỏ hơn hoặc bằng: (<= expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left <= right
+
+    def _handle_greater_equal(self, ctx):
+        # So sánh lớn hơn hoặc bằng: (>= expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        right = self.visit(ctx.expression(1))
+        return left >= right
+
+    def _handle_not(self, ctx):
+        # Phủ định: (not expr)
+        value = self.visit(ctx.expression(0))
+        return not value
 
 
 class ListVisitor(BaseInterpreter):
@@ -827,8 +811,18 @@ class FunctionVisitor(BaseInterpreter):
 
 
 class Interpreter(
-    ExpressionVisitor, ListVisitor, BranchVisitor, LoopVisitor, FunctionVisitor
+    ArithmeticVisitor,
+    BooleanVisitor,
+    ListVisitor,
+    BranchVisitor,
+    LoopVisitor,
+    FunctionVisitor,
 ):
+    def __init__(self):
+        super().__init__()
+        self.env = SymbolTable()
+        BuiltInFunctions.register_defaults()
+
     def visit(self, tree):
         """Override visit with error handling"""
         try:
