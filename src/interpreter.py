@@ -395,73 +395,62 @@ class ListVisitor(BaseInterpreter):
         return result
 
     def visitListOpExpr(self, ctx):
-        operation = ctx.getChild(0).getText()
-        lst = None
-        index = None
+        op = ctx.getChild(0).getText()
+        handlers = {
+            "head":   self._handle_head,
+            "tail":   self._handle_tail,
+            "getid":  self._handle_getid,
+            "sizeof": self._handle_sizeof
+        }
+        if op not in handlers:
+            raise OnionNameError(f"Unknown list operation '{op}'")
+        return handlers[op](ctx)
 
-        try:
-            if operation == "head" or operation == "tail" or operation == "sizeof":
-                # resolves expression
-                if ctx.expression() and len(ctx.expression()) > 0:
-                    expr_ctx = ctx.expression(0)
-                    lst = self.visit(expr_ctx)
-                else:
-                    # resolves ID
-                    var_name = ctx.getChild(1).getText()
-                    try:
-                        lst = self.env.resolve(var_name)
-                    except Exception as resolve_err:
-                        print(
-                            f"DEBUG ListOp: Failed to resolve potential identifier {var_name}: {resolve_err}"
-                        )
-                        raise NameError(f"Variable '{var_name}' is not defined")
+    def _resolve_list(self, ctx, expr_index):
+        # Prefer explicit expression argument
+        if len(ctx.expression()) > expr_index:
+            lst = self.visit(ctx.expression(expr_index))
+        else:
+            # Fallback: next token after op is an identifier
+            var_name = ctx.getChild(expr_index + 1).getText()
+            try:
+                lst = self.env.resolve(var_name)
+            except NameError:
+                raise OnionNameError(f"Variable '{var_name}' is not defined")
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
+        return lst
 
-            elif operation == "getid":
-                # Grammar: 'getid' expression expression
-                if not ctx.expression() or len(ctx.expression()) < 2:
-                    raise ValueError(
-                        "getid requires an index expression and a list expression"
-                    )
+    def _validate_non_empty(self, lst, op):
+        if not lst:
+            raise OnionRuntimeError(f"Cannot perform '{op}' on empty list")
 
-                # Get index (first expression)
-                index_expr_ctx = ctx.expression(0)
-                index = self.visit(index_expr_ctx)
-                if not isinstance(index, int):
-                    raise TypeError(
-                        f"Index must be an integer, got {type(index).__name__}"
-                    )
+    def _handle_head(self, ctx):
+        lst = self._resolve_list(ctx, 0)
+        self._validate_non_empty(lst, "head")
+        return lst[0]
 
-                # Get list (second expression)
-                list_expr_ctx = ctx.expression(1)
-                lst = self.visit(list_expr_ctx)
+    def _handle_tail(self, ctx):
+        lst = self._resolve_list(ctx, 0)
+        self._validate_non_empty(lst, "tail")
+        return lst[1:]
 
-        except Exception as e:
-            # Log the original error for clarity
-            # print(f"DEBUG ListOp: Caught exception during argument evaluation: {e}")
-            raise ValueError(f"Error evaluating {operation} expression: {str(e)}")
+    def _handle_getid(self, ctx):
+        if len(ctx.expression()) < 2:
+            raise OnionArgumentError("getid requires an index and a list")
+        index = self.visit(ctx.expression(0))
+        if not isinstance(index, int):
+            raise OnionTypeError(f"Index must be an integer, got {type(index).__name__}")
+        lst = self.visit(ctx.expression(1))
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
+        if index < 0 or index >= len(lst):
+            raise OnionRuntimeError(f"Index {index} out of range for list of length {len(lst)}")
+        return lst[index]
 
-        # Kiểm tra và thực hiện thao tác
-        if lst is not None:
-            if not isinstance(lst, list):
-                raise TypeError(f"Expected a list but got {type(lst).__name__}")
-
-            if not lst and operation != "sizeof":
-                raise ValueError(f"Cannot perform {operation} on empty list")
-
-            if operation == "head":
-                return lst[0]
-            elif operation == "tail":
-                return lst[1:]
-            elif operation == "getid":
-                if index < 0 or index >= len(lst):
-                    raise IndexError(
-                        f"Index {index} out of range for list of length {len(lst)}"
-                    )
-                return lst[index]
-            elif operation == "sizeof":
-                return len(lst)
-
-        raise ValueError(f"Could not evaluate list expression for {operation}")
+    def _handle_sizeof(self, ctx):
+        lst = self._resolve_list(ctx, 0)
+        return len(lst)
 
 
 class BranchVisitor(BaseInterpreter):
