@@ -19,7 +19,6 @@ statementType:
 	| functionDef
 	| returnStmt
 	| block
-	| functionCall
 	| ifExpr
 	| branchExpr;
 
@@ -37,10 +36,9 @@ compoundExpr:
 	arithmeticExpr
 	| booleanExpr
 	| listExpr
-	| functionCall
+	| callExpr
 	| ifExpr
 	| branchExpr
-	| macroCall
 	| listOpExpr;
 
 arithmeticExpr:
@@ -77,7 +75,7 @@ functionDef:
 
 returnStmt: 'return' expression;
 
-functionCall:
+callExpr:
 	IDENTIFIER expression*; // Simplified argument list - allows zero args
 
 printStatement: 'print' expression;
@@ -97,9 +95,7 @@ listOpExpr:
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
 macroDef:
-	'macro' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
-
-macroCall: IDENTIFIER expression*; // Simplified args
+	'macro' IDENTIFIER '(' (IDENTIFIER)* ')' block; // Simplified params
 
 classDef: 'class' IDENTIFIER classBody;
 

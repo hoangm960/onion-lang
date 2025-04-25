@@ -161,89 +161,6 @@ class Interpreter(OnionVisitor):
                 i += 1
             return result
 
-    # def visitProgram(self, ctx):
-    #     print("DEBUG: Entering visitProgram")
-    #     result = None
-
-    #     # Store the original visit method to wrap it
-    #     original_visit = self.visit
-
-    #     # Define a new visit method that adds debugging
-    #     def debug_visit(node):
-    #         method_name = node.__class__.__name__
-    #         # Strip "Context" suffix if it exists
-    #         if method_name.endswith("Context"):
-    #             method_name = method_name[:-7]
-    #         print(f"DEBUG: Visiting {method_name}")
-
-    #         # Call the original visit method and track the result
-    #         visit_result = original_visit(node)
-    #         print(f"DEBUG: Finished {method_name} with result type: {type(visit_result)}")
-    #         if visit_result is None:
-    #             print(f"DEBUG: Warning - {method_name} returned None")
-    #         return visit_result
-
-    #     # Temporarily replace the visit method
-    #     self.visit = debug_visit
-
-    #     try:
-    #         for stmt in ctx.statement():
-    #             print(f"DEBUG: Processing statement: {stmt.getText()}")
-    #             result = self.visit(stmt)
-
-    #             # Check if there's an error about undefined name, try as function call
-    #             if isinstance(result, Exception) and isinstance(result, NameError) and "' is not defined" in str(result):
-    #                 # Extract name from error message
-    #                 var_name = str(result).split("'")[1]
-
-    #                 # Check if it's a function name
-    #                 if var_name in self.functions:
-    #                     print(f"DEBUG: Found function '{var_name}', executing it")
-    #                     # This is a parameter-less function call
-    #                     try:
-    #                         # Create new environment
-    #                         function_env = SymbolTable(self.env)
-
-    #                         # Save current environment
-    #                         previous_env = self.env
-
-    #                         # Set new environment
-    #                         self.env = function_env
-
-    #                         # Get function body from function definition
-    #                         body = self.functions[var_name]['body']
-
-    #                         # Execute function body
-    #                         call_result = None
-    #                         for i in range(body.getChildCount()):
-    #                             print(f"DEBUG: Executing function body statement {i}")
-    #                             stmt_result = self.visit(body.getChild(i))
-    #                             if isinstance(stmt_result, ReturnValue):
-    #                                 call_result = stmt_result.value
-    #                                 print(f"DEBUG: Return value from function: {call_result}")
-    #                                 break
-    #                             elif stmt_result is not None:
-    #                                 call_result = stmt_result
-
-    #                         # Restore environment
-    #                         self.env = previous_env
-
-    #                         # Reassign result
-    #                         result = call_result
-    #                         print(f"DEBUG: Function execution result: {result}")
-    #                     except Exception as e:
-    #                         print(f"DEBUG: Error during function execution: {e}")
-    #                         # If there's an error, keep the original error result
-    #                         pass
-    #                 else:
-    #                     print(f"DEBUG: '{var_name}' is not a defined function")
-    #     finally:
-    #         # Restore the original visit method
-    #         self.visit = original_visit
-
-    #     print(f"DEBUG: Exiting visitProgram with result: {result}")
-    #     return result
-
     def visitExpression(self, ctx):
         # Check các loại cụ thể của expression
         if ctx.literal():
@@ -270,14 +187,12 @@ class Interpreter(OnionVisitor):
             return self.visit(ctx.booleanExpr())
         elif ctx.listExpr():
             return self.visit(ctx.listExpr())
-        elif ctx.functionCall():
-            return self.visit(ctx.functionCall())
+        elif ctx.callExpr():
+            return self.visit(ctx.callExpr())
         elif ctx.ifExpr():
             return self.visit(ctx.ifExpr())
         elif ctx.branchExpr():
             return self.visit(ctx.branchExpr())
-        elif ctx.macroCall():
-            return self.visit(ctx.macroCall())
         elif ctx.listOpExpr():
             return self.visit(ctx.listOpExpr())
         return None
@@ -617,13 +532,16 @@ class Interpreter(OnionVisitor):
 
         return None  # Định nghĩa hàm không trả về giá trị
 
-    def visitFunctionCall(self, ctx):
+    def visitCallExpr(self, ctx):
         """Xử lý lời gọi hàm"""
         # Lấy tên hàm từ IDENTIFIER
-        function_name = ctx.IDENTIFIER().getText()
+        name = ctx.IDENTIFIER().getText()
+        
+        if name in self.macros:
+            return self.visitMacroCall(ctx)
 
         # Len Function
-        if function_name == "len":
+        if name == "len":
             args = []
             for i in range(1, ctx.getChildCount()):
                 args.append(ctx.getChild(i))
@@ -638,7 +556,7 @@ class Interpreter(OnionVisitor):
                 )
 
         # Type checking
-        if function_name == "typeof":
+        if name == "typeof":
             if len(ctx.expression()) != 1:
                 raise ValueError("typeof requires exactly one argument")
             value = self.visit(ctx.expression(0))
@@ -653,11 +571,11 @@ class Interpreter(OnionVisitor):
             elif isinstance(value, list):
                 return "list"
 
-        if function_name not in self.functions:
-            raise NameError(f"Function '{function_name}' is not defined")
+        if name not in self.functions:
+            raise NameError(f"Function '{name}' is not defined")
 
         # Lấy định nghĩa hàm
-        function_def = self.functions[function_name]
+        function_def = self.functions[name]
         params = function_def["params"]
         body = function_def["body"]
 
@@ -680,7 +598,7 @@ class Interpreter(OnionVisitor):
         # Kiểm tra số lượng đối số
         if len(args) != len(params):
             raise ValueError(
-                f"Function '{function_name}' expected {len(params)} arguments, got {len(args)}"
+                f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
             )
 
         # Lưu trữ phạm vi biến hiện tại
@@ -690,7 +608,7 @@ class Interpreter(OnionVisitor):
         function_env = SymbolTable(previous_env)
 
         # Nếu là hàm factorial, thêm sẵn các biến khai báo trong thân hàm
-        if function_name == "factorial":
+        if name == "factorial":
             function_env.define("n", args[0])
             function_env.define("result", 1)
             function_env.define("i", 1)
@@ -882,7 +800,7 @@ class Interpreter(OnionVisitor):
     def visitMacroCall(self, ctx):
         macro_name = ctx.IDENTIFIER().getText()
 
-        if macro_name not in self.functions:
+        if macro_name not in self.macros:
             raise NameError(f"Macro '{macro_name}' is not defined")
 
         macro_def = self.macros[macro_name]
