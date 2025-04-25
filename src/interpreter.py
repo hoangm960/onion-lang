@@ -406,25 +406,6 @@ class ListVisitor(BaseInterpreter):
             raise OnionNameError(f"Unknown list operation '{op}'")
         return handlers[op](ctx)
 
-    def _resolve_list(self, ctx, expr_index):
-        # Prefer explicit expression argument
-        if len(ctx.expression()) > expr_index:
-            lst = self.visit(ctx.expression(expr_index))
-        else:
-            # Fallback: next token after op is an identifier
-            var_name = ctx.getChild(expr_index + 1).getText()
-            try:
-                lst = self.env.resolve(var_name)
-            except NameError:
-                raise OnionNameError(f"Variable '{var_name}' is not defined")
-        if not isinstance(lst, list):
-            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
-        return lst
-
-    def _validate_non_empty(self, lst, op):
-        if not lst:
-            raise OnionRuntimeError(f"Cannot perform '{op}' on empty list")
-
     def _handle_head(self, ctx):
         lst = self._resolve_list(ctx, 0)
         self._validate_non_empty(lst, "head")
@@ -455,6 +436,25 @@ class ListVisitor(BaseInterpreter):
     def _handle_sizeof(self, ctx):
         lst = self._resolve_list(ctx, 0)
         return len(lst)
+
+    def _resolve_list(self, ctx, expr_index):
+        # Prefer explicit expression argument
+        if len(ctx.expression()) > expr_index:
+            lst = self.visit(ctx.expression(expr_index))
+        else:
+            # Fallback: next token after op is an identifier
+            var_name = ctx.getChild(expr_index + 1).getText()
+            try:
+                lst = self.env.resolve(var_name)
+            except NameError:
+                raise OnionNameError(f"Variable '{var_name}' is not defined")
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
+        return lst
+
+    def _validate_non_empty(self, lst, op):
+        if not lst:
+            raise OnionRuntimeError(f"Cannot perform '{op}' on empty list")
 
 
 class ConditionalVisitor(BaseInterpreter):
@@ -496,87 +496,78 @@ class ConditionalVisitor(BaseInterpreter):
 
 class LoopVisitor(BaseInterpreter):
     def visitLoopStatement(self, ctx):
-        # Xác định loại vòng lặp
-        first_token = ctx.getChild(0).getText()
+        loop_type = ctx.getChild(0).getText()
+        handlers = {
+            "repeat": self._handle_repeat,
+            "loop": self._handle_for_loop,
+            "while": self._handle_while,
+        }
+        if loop_type not in handlers:
+            raise OnionNameError(f"Unknown loop type '{loop_type}'")
+        return handlers[loop_type](ctx)
 
-        if first_token == "repeat":
-            # Vòng lặp repeat: (repeat expression block)
-            count = self.visit(ctx.expression(0))
-            if not isinstance(count, int):
-                raise TypeError("Repeat count must be an integer")
-            if count < 0:
-                raise ValueError("Repeat count cannot be negative")
+    def _handle_repeat(self, ctx):
+        count = self.visit(ctx.expression(0))
+        if not isinstance(count, int):
+            raise OnionTypeError("Repeat count must be an integer")
+        if count < 0:
+            raise OnionRuntimeError("Repeat count cannot be negative")
 
-            result = None
-            # Lấy block theo cách thủ công - block là phần tử thứ 3 (index 2)
-            # 'repeat', expression, block
-            block_node = None
-            if ctx.getChildCount() > 2:
-                block_node = ctx.getChild(2)
+        block_node = ctx.getChild(2) if ctx.getChildCount() > 2 else None
+        return self._iterate_block(block_node, range(count))
 
-            if block_node is not None:
-                for _ in range(count):
-                    result = self.visit(block_node)
+    def _handle_for_loop(self, ctx):
+        var_name = ctx.IDENTIFIER().getText()
+        start = self.visit(ctx.expression(0))
+        end = self.visit(ctx.expression(1))
+        step = self.visit(ctx.expression(2)) if len(ctx.expression()) > 2 else 1
 
-                    if isinstance(result, ReturnValue):
-                        return result
-            return result
+        for val, name in ((start, "start"), (end, "end"), (step, "step")):
+            if not isinstance(val, int):
+                raise OnionTypeError(f"Loop {name} must be an integer")
+        if step == 0:
+            raise OnionRuntimeError("Step cannot be zero")
 
-        elif first_token == "loop":
-            # Vòng lặp loop: (loop IDENTIFIER range (start end step?) block)
-            var_name = ctx.IDENTIFIER().getText()
-            start = self.visit(ctx.expression(0))
-            end = self.visit(ctx.expression(1))
+        block_node = ctx.getChild(ctx.getChildCount() - 1)
+        seq = range(start, end, step)
 
-            # Xác định bước nhảy
-            step = 1
-            if ctx.expression(2) is not None:  # Có tham số step
-                step = self.visit(ctx.expression(2))
-                if step == 0:
-                    raise ValueError("Step cannot be zero")
-
-            result = None
-            current = start
-
-            # Lấy block - block là phần tử cuối cùng
-            block_node = ctx.getChild(ctx.getChildCount() - 1)
-
-            while (step > 0 and current < end) or (step < 0 and current > end):
+        def body():
+            for current in seq:
                 self.env.define(var_name, current)
-                if block_node is not None:
-                    result = self.visit(block_node)
+                yield self.visit(block_node)
 
-                if isinstance(result, ReturnValue):
-                    return result
-                current += step
-            return result
+        return self._collect_loop_result(body())
 
-        elif first_token == "while":
-            # Vòng lặp while: (while expression block)
-            result = None
+    def _handle_while(self, ctx):
+        cond_ctx = ctx.expression(0)
+        block_node = ctx.getChild(2) if ctx.getChildCount() > 2 else None
 
-            # Lấy biểu thức điều kiện
-            condition = ctx.expression(0)
-
-            # Lấy block - block là phần tử thứ 3 (index 2)
-            # 'while', expression, block
-            block_node = None
-            if ctx.getChildCount() > 2:
-                block_node = ctx.getChild(2)
-
-            # Lặp lại khi điều kiện còn đúng
+        def body():
             while True:
-                condition_value = self.visit(condition)
-                if not condition_value:
+                cond = self.visit(cond_ctx)
+                if not isinstance(cond, bool):
+                    raise OnionTypeError("While condition must be boolean")
+                if not cond:
                     break
+                yield self.visit(block_node)
 
-                if block_node is not None:
-                    result = self.visit(block_node)
-                    if isinstance(result, ReturnValue):
-                        return result
-            return result
+        return self._collect_loop_result(body())
 
-        return None
+    def _iterate_block(self, block_node, iterator):
+        result = None
+        for _ in iterator:
+            result = self.visit(block_node)
+            if isinstance(result, ReturnValue):
+                return result
+        return result
+
+    def _collect_loop_result(self, results):
+        last = None
+        for res in results:
+            if isinstance(res, ReturnValue):
+                return res
+            last = res
+        return last
 
 
 class FunctionVisitor(BaseInterpreter):
