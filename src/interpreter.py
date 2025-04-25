@@ -294,11 +294,15 @@ class Interpreter(OnionVisitor):
                 if isinstance(result, str) and isinstance(value, str):
                     result = result + value
                 # Else if number then add (can be int or float)
-                elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
+                elif isinstance(result, (int, float)) and isinstance(
+                    value, (int, float)
+                ):
                     result = result + value
                 # Else TypeError
                 else:
-                    raise TypeError(f"Cannot add values of type {type(result)} and {type(value)}")
+                    raise TypeError(
+                        f"Cannot add values of type {type(result)} and {type(value)}"
+                    )
             return result
 
         elif op == "-":
@@ -464,7 +468,7 @@ class Interpreter(OnionVisitor):
             # Kiểm tra nếu kết quả là ReturnValue
             if isinstance(result, ReturnValue):
                 # Gặp lệnh return, dừng việc xử lý block và trả về đối tượng ReturnValue
-                break
+                return result
 
         return result
 
@@ -490,6 +494,9 @@ class Interpreter(OnionVisitor):
             if block_node is not None:
                 for _ in range(count):
                     result = self.visit(block_node)
+
+                    if isinstance(result, ReturnValue):
+                        return result
             return result
 
         elif first_token == "loop":
@@ -515,6 +522,9 @@ class Interpreter(OnionVisitor):
                 self.env.define(var_name, current)
                 if block_node is not None:
                     result = self.visit(block_node)
+                
+                if isinstance(result, ReturnValue):
+                    return result
                 current += step
             return result
 
@@ -539,6 +549,8 @@ class Interpreter(OnionVisitor):
 
                 if block_node is not None:
                     result = self.visit(block_node)
+                    if isinstance(result, ReturnValue):
+                        return result
             return result
 
         return None
@@ -609,11 +621,11 @@ class Interpreter(OnionVisitor):
         """Xử lý lời gọi hàm"""
         # Lấy tên hàm từ IDENTIFIER
         function_name = ctx.IDENTIFIER().getText()
-        
+
         # Len Function
         if function_name == "len":
             args = []
-            for i in range(1, ctx.getChildCount()):  
+            for i in range(1, ctx.getChildCount()):
                 args.append(ctx.getChild(i))
             if len(args) != 1:
                 raise ValueError(f"len expected 1 argument, got {len(args)}")
@@ -621,8 +633,10 @@ class Interpreter(OnionVisitor):
             if isinstance(value, (list, str)):
                 return len(value)
             else:
-                raise TypeError(f"len expects string or list, got {type(value).__name__}")
-            
+                raise TypeError(
+                    f"len expects string or list, got {type(value).__name__}"
+                )
+
         # Type checking
         if function_name == "typeof":
             if len(ctx.expression()) != 1:
@@ -906,4 +920,3 @@ class Interpreter(OnionVisitor):
             self.env = previous_env
 
         return result
-

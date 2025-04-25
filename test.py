@@ -43,7 +43,7 @@ class SemanticTest(FileTestCase):
         OUTPUT_FILE_PATH = os.path.join(OUTPUT_DIR, filename)
 
         output = self.capture_output(code)
-        if output:
+        if not output is None:
             output = output.strip()
             with open(OUTPUT_FILE_PATH, "w") as fout:
                 fout.write(output)
