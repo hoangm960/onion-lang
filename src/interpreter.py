@@ -164,37 +164,16 @@ class BaseInterpreter(OnionVisitor):
         # Nếu không có biểu thức, trả về None
         return ReturnValue(None)
 
-    def execute_block(self, statements, environment):
-        """Thực thi khối lệnh với môi trường cục bộ mới."""
-        previous = self.env
-        try:
-            self.env = environment
-            result = None
-            for statement in statements:
-                result = self.visit(statement)
-                if isinstance(result, ReturnValue):
-                    break
-            return result
-        finally:
-            self.env = previous
-
-    def visitConditionalStmt(self, ctx):
-        # Xử lý câu lệnh điều kiện: (if condition then-block [else else-block])
-        condition_result = self.visit(ctx.expression())
-
-        if condition_result:
-            # Thực thi khối then
-            result = self.visit(ctx.block(0))
-        else:
-            # Nếu có khối else, thực thi nó
-            if ctx.block(1) is not None:
-                result = self.visit(ctx.block(1))
-            else:
-                result = None
-
-        # Kiểm tra nếu kết quả là ReturnValue từ bên trong block
+    def _execute_block(self, body):
+        result = None
+        for i in range(body.getChildCount()):
+            stmt_result = self.visit(body.getChild(i))
+            if isinstance(stmt_result, ReturnValue):
+                result = stmt_result.value
+                break
+            elif stmt_result is not None:
+                result = stmt_result
         return result
-
 
 class ExpressionVisitor(BaseInterpreter):
     def _resolve_identifier(self, ctx):
@@ -572,222 +551,81 @@ class LoopVisitor(BaseInterpreter):
 
 class FunctionVisitor(BaseInterpreter):
     def visitFunctionDef(self, ctx):
-        """Xử lý định nghĩa hàm"""
-        # Lấy tên hàm từ phần tử đầu tiên trong danh sách IDENTIFIER
         identifiers = ctx.IDENTIFIER()
+        if not identifiers:
+            return None
 
-        if len(identifiers) > 0:
-            function_name = identifiers[0].getText()
-
-            # Lấy các tham số từ phần còn lại của danh sách IDENTIFIER
-            params = []
-            for i in range(1, len(identifiers)):
-                param_name = identifiers[i].getText()
-                params.append(param_name)
-
-            # Lấy block mã
-            block_node = ctx.block()
-
-            # Lưu trữ thông tin hàm
-            self.functions[function_name] = {"params": params, "body": block_node}
-
-        return None  # Định nghĩa hàm không trả về giá trị
+        name = identifiers[0].getText()
+        params = [ident.getText() for ident in identifiers[1:]]
+        self.functions[name] = {
+            "params": params,
+            "body": ctx.block()
+        }
+        return None
 
     def visitMacroDef(self, ctx):
         identifiers = ctx.IDENTIFIER()
+        if not identifiers:
+            return None
 
-        if len(identifiers) > 0:
-            macro_name = identifiers[0].getText()
-
-            params = []
-            for i in range(1, len(identifiers)):
-                param_name = identifiers[i].getText()
-                params.append(param_name)
-
-            block_node = ctx.block()
-
-            self.macros[macro_name] = {"params": params, "body": block_node}
-
+        name = identifiers[0].getText()
+        params = [ident.getText() for ident in identifiers[1:]]
+        self.macros[name] = {
+            "params": params,
+            "body": ctx.block()
+        }
         return None
 
     def visitCallExpr(self, ctx):
-        """Xử lý lời gọi hàm"""
-        # Lấy tên hàm từ IDENTIFIER
         name = ctx.IDENTIFIER().getText()
-
+        # Macro calls
         if name in self.macros:
-            return self.visitMacroCall(ctx)
+            return self._call_callable(self.macros[name],
+                                       [self.visit(e) for e in ctx.expression()],
+                                       is_macro=True)
 
-        # Len Function
-        if name == "len":
-            args = []
-            for i in range(1, ctx.getChildCount()):
-                args.append(ctx.getChild(i))
-            if len(args) != 1:
-                raise ValueError(f"len expected 1 argument, got {len(args)}")
-            value = self.visit(args[0])
-            if isinstance(value, (list, str)):
-                return len(value)
-            else:
-                raise TypeError(
-                    f"len expects string or list, got {type(value).__name__}"
-                )
+        # Built-in functions
+        if name in BuiltInFunctions.registry:
+            args = [self.visit(e) for e in ctx.expression()]
+            return BuiltInFunctions.execute(name, self, args)
 
-        # Type checking
-        if name == "typeof":
-            if len(ctx.expression()) != 1:
-                raise ValueError("typeof requires exactly one argument")
-            value = self.visit(ctx.expression(0))
-            if isinstance(value, int):
-                return "int"
-            elif isinstance(value, float):
-                return "float"
-            elif isinstance(value, str):
-                return "string"
-            elif isinstance(value, bool):
-                return "bool"
-            elif isinstance(value, list):
-                return "list"
-
+        # User-defined functions
         if name not in self.functions:
-            raise NameError(f"Function '{name}' is not defined")
+            raise OnionNameError(f"Function '{name}' is not defined")
 
-        # Lấy định nghĩa hàm
-        function_def = self.functions[name]
-        params = function_def["params"]
-        body = function_def["body"]
+        args = [self.visit(e) for e in ctx.expression()]
+        return self._call_callable(self.functions[name], args)
 
-        # Đánh giá các đối số
-        args = []
-
-        # Lấy các biểu thức đối số
-        expressions = []
-        for i in range(ctx.getChildCount()):
-            if i > 0:  # Bỏ qua tên hàm
-                expressions.append(ctx.getChild(i))
-
-        for i, expr in enumerate(expressions):
-            try:
-                arg_value = self.visit(expr)
-                args.append(arg_value)
-            except Exception as e:
-                raise ValueError(f"Error evaluating argument {i+1}: {e}")
-
-        # Kiểm tra số lượng đối số
+    def _call_callable(self, callable_def, args, is_macro=False):
+        params = callable_def["params"]
         if len(args) != len(params):
-            raise ValueError(
-                f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
+            kind = "Macro" if is_macro else "Function"
+            raise OnionArgumentError(
+                f"{kind} expected {len(params)} arguments, got {len(args)}"
             )
+        return self._execute_callable(callable_def, args, is_macro=is_macro)
 
-        # Lưu trữ phạm vi biến hiện tại
-        previous_env = self.env
-
-        # Tạo phạm vi biến mới cho lời gọi hàm
-        function_env = SymbolTable(previous_env)
-
-        # Nếu là hàm factorial, thêm sẵn các biến khai báo trong thân hàm
-        if name == "factorial":
-            function_env.define("n", args[0])
-            function_env.define("result", 1)
-            function_env.define("i", 1)
-            self.env = function_env
-
-            # Bỏ qua 2 khai báo đầu tiên và chỉ thực thi phần còn lại
-            result = None
-            for i in range(2, body.getChildCount()):
-                stmt = body.getChild(i)
-                stmt_result = self.visit(stmt)
-                if isinstance(stmt_result, ReturnValue):
-                    result = stmt_result.value
-                    break
-                elif stmt_result is not None:
-                    result = stmt_result
-
-            # Khôi phục môi trường
-            self.env = previous_env
-            return result
-        else:
-            # Trường hợp hàm thông thường
-            for i, param in enumerate(params):
-                function_env.define(param, args[i])
-
-            # Thực thi thân hàm
-            result = None
-
-            if body:
-                try:
-                    # Thiết lập môi trường mới
-                    self.env = function_env
-
-                    # Thực thi từng câu lệnh trong thân hàm
-                    for i in range(body.getChildCount()):
-                        stmt = body.getChild(i)
-                        stmt_result = self.visit(stmt)
-
-                        # Kiểm tra nếu kết quả là ReturnValue
-                        if isinstance(stmt_result, ReturnValue):
-                            result = stmt_result.value
-                            break
-                        elif stmt_result is not None:
-                            result = stmt_result
-
-                    if (
-                        result is None
-                        and "stmt_result" in locals()
-                        and isinstance(stmt_result, ReturnValue)
-                    ):
-                        result = stmt_result.value
-
-                except Exception as e:
-                    raise e
-                finally:
-                    # Khôi phục môi trường cũ
-                    self.env = previous_env
-
-            return result
-
-    def visitMacroCall(self, ctx):
-        macro_name = ctx.IDENTIFIER().getText()
-
-        if macro_name not in self.macros:
-            raise NameError(f"Macro '{macro_name}' is not defined")
-
-        macro_def = self.macros[macro_name]
-        params = macro_def["params"]
-        body = macro_def["body"]
-
-        args = []
-        for expr in ctx.expression():
-            arg_value = self.visit(expr)
-            args.append(arg_value)
-
+    def _execute_callable(self, callable_def, args, is_macro=False):
+        params = callable_def["params"]
+        body = callable_def["body"]
+        
         if len(args) != len(params):
-            raise ValueError(
-                f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}"
+            error_type = "Macro" if is_macro else "Function"
+            raise OnionArgumentError(
+                f"{error_type} expected {len(params)} arguments, got {len(args)}"
             )
-
+        
         previous_env = self.env
-        macro_env = SymbolTable(previous_env)
-
+        new_env = SymbolTable(previous_env if not is_macro else None)
+        
         for i, param in enumerate(params):
-            macro_env.define(param, args[i])
-
-        result = None
+            new_env.define(param, args[i])
+        
         try:
-            self.env = macro_env
-            for i in range(body.getChildCount()):
-                stmt = body.getChild(i)
-                stmt_result = self.visit(stmt)
-                if isinstance(stmt_result, ReturnValue):
-                    result = stmt_result.value
-                    break
-                elif stmt_result is not None:
-                    result = stmt_result
+            self.env = new_env
+            return self._execute_block(body)
         finally:
             self.env = previous_env
-
-        return result
-
 
 class Interpreter(
     ArithmeticVisitor,
