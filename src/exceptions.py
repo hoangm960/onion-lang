@@ -12,3 +12,7 @@ class OnionNameError(OnionRuntimeError):
 
 class OnionArgumentError(OnionRuntimeError):
     """Raised for incorrect function arguments"""
+
+
+class OnionPrintError(OnionRuntimeError):
+    """Raised for wrong print type/format"""

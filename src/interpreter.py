@@ -1,5 +1,4 @@
 from generated.OnionVisitor import OnionVisitor
-from generated.OnionParser import OnionParser
 import sys
 import os
 from src.symbol_table import SymbolTable
@@ -8,8 +7,10 @@ from src.exceptions import (
     OnionNameError,
     OnionArgumentError,
     OnionTypeError,
+    OnionPrintError
 )
 from src.builtins import BuiltInFunctions
+from antlr4 import TerminalNode, ErrorNode
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -18,6 +19,7 @@ class ReturnValue:
     """Lớp bọc giá trị trả về bởi lệnh return."""
 
     def __init__(self, value):
+        super().__init__()
         self.value = value
 
 
@@ -67,9 +69,7 @@ class BaseInterpreter(OnionVisitor):
             print(value)
             return None
         except Exception as e:
-            # Xử lý các lỗi khác
-            print(f"Print error: {e}")
-            return None
+            raise OnionPrintError from e
 
     def visitAssignment(self, ctx):
         if ctx.getChildCount() == 3:  # 'let' IDENTIFIER expression
@@ -96,17 +96,6 @@ class BaseInterpreter(OnionVisitor):
                 i += 1
             return result
 
-    def visitChildren(self, ctx):
-        # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể
-        result = None
-        for i in range(ctx.getChildCount()):
-            child = ctx.getChild(i)
-            if child:
-                child_result = self.visit(child)
-                if child_result is not None:
-                    result = child_result
-        return result
-
     def visitBlock(self, ctx):
         """Xử lý block các câu lệnh"""
         result = None
@@ -132,20 +121,21 @@ class BaseInterpreter(OnionVisitor):
         current_value = self.env.resolve(var_name)
 
         if not isinstance(current_value, (int, float)):
-            raise TypeError(
+            raise OnionTypeError(
                 f"Cannot increment/decrement non-numeric value: {current_value}"
             )
 
+        new_value = current_value
         if op == "inc":
             # Tăng biến lên 1: (inc x)
-            new_value = current_value + 1
+            new_value += 1
         elif op == "dec":
             # Giảm biến đi 1: (dec x)
-            new_value = current_value - 1
+            new_value -= 1
 
         # Cập nhật giá trị mới
         if not self.env.assign(var_name, new_value):
-            raise NameError(f"Variable '{var_name}' is not defined")
+            raise OnionNameError(f"Variable '{var_name}' is not defined")
 
         return new_value
 
@@ -164,20 +154,25 @@ class BaseInterpreter(OnionVisitor):
         # Nếu không có biểu thức, trả về None
         return ReturnValue(None)
 
-    def _execute_block(self, body):
+    def visitChildren(self, node):
+        # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể
         result = None
-        for i in range(body.getChildCount()):
-            stmt_result = self.visit(body.getChild(i))
-            if isinstance(stmt_result, ReturnValue):
-                result = stmt_result.value
-                break
-            elif stmt_result is not None:
-                result = stmt_result
+
+        for child in node.getChildren():
+            # skip tokens like EOF or punctuation
+            if isinstance(child, TerminalNode) or isinstance(child, ErrorNode):
+                continue
+
+            # accept(self) will dispatch to your visitXxx methods correctly
+            res = child.accept(self)
+            if res is not None:
+                result = res
+
         return result
+
 
 class ExpressionVisitor(BaseInterpreter):
     def _resolve_identifier(self, ctx):
-        """Resolve variable identifier with error handling"""
         var_name = ctx.IDENTIFIER().getText()
         try:
             return self.env.resolve(var_name)
@@ -626,6 +621,17 @@ class FunctionVisitor(BaseInterpreter):
             return self._execute_block(body)
         finally:
             self.env = previous_env
+
+    def _execute_block(self, body):
+        result = None
+        for i in range(body.getChildCount()):
+            stmt_result = self.visit(body.getChild(i))
+            if isinstance(stmt_result, ReturnValue):
+                result = stmt_result.value
+                break
+            elif stmt_result is not None:
+                result = stmt_result
+        return result
 
 class Interpreter(
     ArithmeticVisitor,
