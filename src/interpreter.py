@@ -397,10 +397,10 @@ class ListVisitor(BaseInterpreter):
     def visitListOpExpr(self, ctx):
         op = ctx.getChild(0).getText()
         handlers = {
-            "head":   self._handle_head,
-            "tail":   self._handle_tail,
-            "getid":  self._handle_getid,
-            "sizeof": self._handle_sizeof
+            "head": self._handle_head,
+            "tail": self._handle_tail,
+            "getid": self._handle_getid,
+            "sizeof": self._handle_sizeof,
         }
         if op not in handlers:
             raise OnionNameError(f"Unknown list operation '{op}'")
@@ -440,12 +440,16 @@ class ListVisitor(BaseInterpreter):
             raise OnionArgumentError("getid requires an index and a list")
         index = self.visit(ctx.expression(0))
         if not isinstance(index, int):
-            raise OnionTypeError(f"Index must be an integer, got {type(index).__name__}")
+            raise OnionTypeError(
+                f"Index must be an integer, got {type(index).__name__}"
+            )
         lst = self.visit(ctx.expression(1))
         if not isinstance(lst, list):
             raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
         if index < 0 or index >= len(lst):
-            raise OnionRuntimeError(f"Index {index} out of range for list of length {len(lst)}")
+            raise OnionRuntimeError(
+                f"Index {index} out of range for list of length {len(lst)}"
+            )
         return lst[index]
 
     def _handle_sizeof(self, ctx):
@@ -453,46 +457,41 @@ class ListVisitor(BaseInterpreter):
         return len(lst)
 
 
-class BranchVisitor(BaseInterpreter):
+class ConditionalVisitor(BaseInterpreter):
     def visitIfExpr(self, ctx):
-        """Xử lý biểu thức if-elif-else"""
-        # First expression is the condition
-        if_value = self.visit(ctx.expression(0))
-
-        if if_value:
-            return self.visit(ctx.statement(0))
-        else:
-            num_elifs = len(ctx.expression()) - 1
-
-            for i in range(num_elifs):
-                # Index của expression/statement cho elif bắt đầu từ 1
-                elif_idx = i + 1
-                elif_condition = ctx.expression(elif_idx)
-                elif_value = self.visit(elif_condition)
-
-                if elif_value:
-                    # Nếu điều kiện ELIF đúng, thực thi statement tương ứng
-                    return self.visit(ctx.statement(elif_idx))
-
-            num_statements = len(ctx.statement())
-            if num_statements > num_elifs + 1:  # Có nhánh else
-                else_stmt_index = num_statements - 1
-                return self.visit(ctx.statement(else_stmt_index))
-            else:
-                # Không có nhánh nào được thực thi
-                return None
+        return self._handle_conditional(
+            ctx.expression(), ctx.statement(), construct="if"
+        )
 
     def visitBranchExpr(self, ctx):
-        for i in range(len(ctx.expression())):
-            condition = self.visit(ctx.expression(i))
-            if condition:
-                return self.visit(ctx.statement(i))
+        return self._handle_conditional(
+            ctx.expression(), ctx.statement(), construct="branch"
+        )
 
-        if len(ctx.statement()) > len(ctx.expression()):
-            last_statement_index = len(ctx.statement()) - 1
-            return self.visit(ctx.statement(last_statement_index))
+    def _handle_conditional(self, expr_list, stmt_list, construct):
+        num_conds = len(expr_list)
+        num_stmts = len(stmt_list)
 
+        # Evaluate each condition in order
+        for i, expr_ctx in enumerate(expr_list):
+            cond_value = self.visit(expr_ctx)
+            self._assert_bool(cond_value, construct)
+            if cond_value:
+                return self.visit(stmt_list[i])
+
+        # No condition matched; check for default statement
+        if num_stmts > num_conds:
+            # Default is the last statement
+            return self.visit(stmt_list[-1])
+
+        # No branch taken
         return None
+
+    def _assert_bool(self, value, construct):
+        if not isinstance(value, bool):
+            raise OnionTypeError(
+                f"Condition in '{construct}' must be boolean, got {type(value).__name__}"
+            )
 
 
 class LoopVisitor(BaseInterpreter):
@@ -803,7 +802,7 @@ class Interpreter(
     ArithmeticVisitor,
     BooleanVisitor,
     ListVisitor,
-    BranchVisitor,
+    ConditionalVisitor,
     LoopVisitor,
     FunctionVisitor,
 ):
