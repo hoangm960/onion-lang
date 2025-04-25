@@ -285,16 +285,22 @@ class Interpreter(OnionVisitor):
     def visitArithmeticExpr(self, ctx):
         op = ctx.getChild(0).getText()
 
+        # Addition and string concatenation
         if op == "+":
-            # Addition: Sum all child expressions
-            result = 0
-            for i in range(1, ctx.getChildCount()):
-                child = ctx.getChild(i)
-                value = self.visit(child)
-                if value is None:
-                    raise ValueError(f"Cannot evaluate expression at position {i}")
-                result += value
+            result = self.visit(ctx.getChild(1))
+            for i in range(2, ctx.getChildCount()):
+                value = self.visit(ctx.getChild(i))
+                # If string then concat
+                if isinstance(result, str) and isinstance(value, str):
+                    result = result + value
+                # Else if number then add (can be int or float)
+                elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
+                    result = result + value
+                # Else TypeError
+                else:
+                    raise TypeError(f"Cannot add values of type {type(result)} and {type(value)}")
             return result
+
         elif op == "-":
             # Subtraction: only 2 operands
             if ctx.getChildCount() != 3:
@@ -603,6 +609,36 @@ class Interpreter(OnionVisitor):
         """Xử lý lời gọi hàm"""
         # Lấy tên hàm từ IDENTIFIER
         function_name = ctx.IDENTIFIER().getText()
+        
+        # Len Function
+        if function_name == "len":
+            args = []
+            for i in range(1, ctx.getChildCount()):  
+                args.append(ctx.getChild(i))
+            if len(args) != 1:
+                raise ValueError(f"len expected 1 argument, got {len(args)}")
+            value = self.visit(args[0])
+            if isinstance(value, (list, str)):
+                return len(value)
+            else:
+                raise TypeError(f"len expects string or list, got {type(value).__name__}")
+            
+        # Type checking
+        if function_name == "typeof":
+            if len(ctx.expression()) != 1:
+                raise ValueError("type-of requires exactly one argument")
+            value = self.visit(ctx.expression(0))
+            
+            if isinstance(value, int):
+                return "int"
+            elif isinstance(value, float):
+                return "float"
+            elif isinstance(value, str):
+                return "string"
+            elif isinstance(value, bool):
+                return "bool"
+            elif isinstance(value, list):
+                return "list"
 
         if function_name not in self.functions:
             raise NameError(f"Function '{function_name}' is not defined")
