@@ -18,7 +18,6 @@ class FileTestCase(unittest.TestCase):
 
 
 class SemanticTest(FileTestCase):
-
     def capture_output(self, code: str):
         parser = Parser()
         tree = parser.parse_input(code)
@@ -33,7 +32,7 @@ class SemanticTest(FileTestCase):
                 sys.stdout = old_stdout
         return None
 
-    def assertOnionOutput(self, code, expected_lines):
+    def assertOutput(self, code, expected_lines):
         filename = os.path.basename(self.file_path)
         OUTPUT_DIR = os.path.join(
             TEST_DIR,
@@ -49,6 +48,8 @@ class SemanticTest(FileTestCase):
             with open(OUTPUT_FILE_PATH, "w") as fout:
                 fout.write(output)
             self.assertEqual(output, expected_lines.strip())
+        else:
+            self.fail("No output")
 
     def setUp(self):
         self.interpreter = Interpreter()
@@ -61,7 +62,7 @@ class SemanticTest(FileTestCase):
         if not test_data:
             raise Exception("File empty")
         code, expectedOutput = test_data.split("\n\n")
-        self.assertOnionOutput(code, expectedOutput)
+        self.assertOutput(code, expectedOutput)
 
 
 def get_suite():
