@@ -626,9 +626,8 @@ class Interpreter(OnionVisitor):
         # Type checking
         if function_name == "typeof":
             if len(ctx.expression()) != 1:
-                raise ValueError("type-of requires exactly one argument")
+                raise ValueError("typeof requires exactly one argument")
             value = self.visit(ctx.expression(0))
-            
             if isinstance(value, int):
                 return "int"
             elif isinstance(value, float):
