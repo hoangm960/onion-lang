@@ -7,8 +7,10 @@ from src.exceptions import (
     OnionNameError,
     OnionArgumentError,
     OnionTypeError,
+    OnionPrintError
 )
 from src.builtins import BuiltInFunctions
+from antlr4 import TerminalNode, ErrorNode
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -17,6 +19,7 @@ class ReturnValue:
     """Lớp bọc giá trị trả về bởi lệnh return."""
 
     def __init__(self, value):
+        super().__init__()
         self.value = value
 
 
@@ -66,9 +69,7 @@ class BaseInterpreter(OnionVisitor):
             print(value)
             return None
         except Exception as e:
-            # Xử lý các lỗi khác
-            print(f"Print error: {e}")
-            return None
+            raise OnionPrintError from e
 
     def visitAssignment(self, ctx):
         if ctx.getChildCount() == 3:  # 'let' IDENTIFIER expression
@@ -95,17 +96,6 @@ class BaseInterpreter(OnionVisitor):
                 i += 1
             return result
 
-    def visitChildren(self, ctx):
-        # Phương thức này đảm bảo mọi nút con đều được ghé thăm, hữu ích cho các quy tắc chưa có phương thức visit cụ thể
-        result = None
-        for i in range(ctx.getChildCount()):
-            child = ctx.getChild(i)
-            if child:
-                child_result = self.visit(child)
-                if child_result is not None:
-                    result = child_result
-        return result
-
     def visitBlock(self, ctx):
         """Xử lý block các câu lệnh"""
         result = None
@@ -131,16 +121,17 @@ class BaseInterpreter(OnionVisitor):
         current_value = self._resolve_variable(var_name)
 
         if not isinstance(current_value, (int, float)):
-            raise TypeError(
+            raise OnionTypeError(
                 f"Cannot increment/decrement non-numeric value: {current_value}"
             )
 
+        new_value = current_value
         if op == "inc":
             # Tăng biến lên 1: (inc x)
-            new_value = current_value + 1
+            new_value += 1
         elif op == "dec":
             # Giảm biến đi 1: (dec x)
-            new_value = current_value - 1
+            new_value -= 1
 
         # Cập nhật giá trị mới
         if not self._assign_variable(var_name, new_value):
@@ -195,13 +186,21 @@ class BaseInterpreter(OnionVisitor):
             else:
                 result = None
 
-        # Kiểm tra nếu kết quả là ReturnValue từ bên trong block
+        for child in node.getChildren():
+            # skip tokens like EOF or punctuation
+            if isinstance(child, TerminalNode) or isinstance(child, ErrorNode):
+                continue
+
+            # accept(self) will dispatch to your visitXxx methods correctly
+            res = child.accept(self)
+            if res is not None:
+                result = res
+
         return result
 
 
 class ExpressionVisitor(BaseInterpreter):
     def _resolve_identifier(self, ctx):
-        """Resolve variable identifier with error handling"""
         var_name = ctx.IDENTIFIER().getText()
         try:
             return self._resolve_variable(var_name)
@@ -656,42 +655,29 @@ class LoopVisitor(BaseInterpreter):
 
 class FunctionVisitor(BaseInterpreter):
     def visitFunctionDef(self, ctx):
-        """Xử lý định nghĩa hàm"""
-        # Lấy tên hàm từ phần tử đầu tiên trong danh sách IDENTIFIER
         identifiers = ctx.IDENTIFIER()
+        if not identifiers:
+            return None
 
-        if len(identifiers) > 0:
-            function_name = identifiers[0].getText()
-
-            # Lấy các tham số từ phần còn lại của danh sách IDENTIFIER
-            params = []
-            for i in range(1, len(identifiers)):
-                param_name = identifiers[i].getText()
-                params.append(param_name)
-
-            # Lấy block mã
-            block_node = ctx.block()
-
-            # Lưu trữ thông tin hàm
-            self.functions[function_name] = {"params": params, "body": block_node}
-
-        return None  # Định nghĩa hàm không trả về giá trị
+        name = identifiers[0].getText()
+        params = [ident.getText() for ident in identifiers[1:]]
+        self.functions[name] = {
+            "params": params,
+            "body": ctx.block()
+        }
+        return None
 
     def visitMacroDef(self, ctx):
         identifiers = ctx.IDENTIFIER()
+        if not identifiers:
+            return None
 
-        if len(identifiers) > 0:
-            macro_name = identifiers[0].getText()
-
-            params = []
-            for i in range(1, len(identifiers)):
-                param_name = identifiers[i].getText()
-                params.append(param_name)
-
-            block_node = ctx.block()
-
-            self.macros[macro_name] = {"params": params, "body": block_node}
-
+        name = identifiers[0].getText()
+        params = [ident.getText() for ident in identifiers[1:]]
+        self.macros[name] = {
+            "params": params,
+            "body": ctx.block()
+        }
         return None
 
     def visitCallExpr(self, ctx):
@@ -827,7 +813,6 @@ class FunctionVisitor(BaseInterpreter):
             except Exception as e:
                 raise OnionRuntimeError(f"Error evaluating argument: {e}")
         return args
-
 
 class Interpreter(
     ArithmeticVisitor,

@@ -8,34 +8,60 @@ class BuiltInFunctions:
 
     @classmethod
     def register_defaults(cls):
-        """Register core built-in functions"""
-        cls.register("len", cls.len)
-        cls.register("typeof", cls.typeof)
+        cls.register("len", cls._len)
+        cls.register("typeof", cls._typeof)
+        cls.register("factorial", cls._factorial)
 
     @classmethod
     def register(cls, name, func):
-        """Register a new built-in function"""
         cls.registry[name] = func
 
-    @staticmethod
-    def execute(name, interpreter, args):
-        """Execute a built-in function"""
+    @classmethod
+    def execute(cls, name, interpreter, args):
         if name not in cls.registry:
-            raise OnionNameError(f"Undefined built-in function: {name}")
+            raise OnionNameError(f"Undefined built-in function '{name}'")
         return cls.registry[name](interpreter, args)
 
     @staticmethod
-    def len(interpreter, args):
+    def _len(interpreter, args):
         if len(args) != 1:
-            raise OnionArgumentError("len() expects exactly 1 argument")
+            raise OnionArgumentError(f"len() expects 1 argument, got {len(args)}")
         value = args[0]
         if isinstance(value, (list, str)):
             return len(value)
-        raise OnionTypeError("len() requires string or list")
+        raise OnionTypeError(
+            f"len() requires a list or string, got {type(value).__name__}"
+        )
 
     @staticmethod
-    def typeof(interpreter, args):
+    def _typeof(interpreter, args):
         if len(args) != 1:
-            raise OnionArgumentError("typeof() expects exactly 1 argument")
+            raise OnionArgumentError(f"typeof() expects 1 argument, got {len(args)}")
         value = args[0]
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, float):
+            return "float"
+        if isinstance(value, str):
+            return "string"
+        if isinstance(value, list):
+            return "list"
         return type(value).__name__
+
+    @staticmethod
+    def _factorial(interpreter, args):
+        if len(args) != 1:
+            raise OnionArgumentError(f"factorial() expects 1 argument, got {len(args)}")
+        n = args[0]
+        if not isinstance(n, int):
+            raise OnionTypeError(
+                f"factorial() requires an integer, got {type(n).__name__}"
+            )
+        if n < 0:
+            raise OnionArgumentError("factorial() argument must be non-negative")
+        result = 1
+        for i in range(1, n + 1):
+            result *= i
+        return result
