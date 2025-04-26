@@ -1,0 +1,43 @@
+# Function Test File for Onion Interpreter
+# Contains 3 complex functions to test function call implementation
+
+# Function 1: Fibonacci sequence with recursion
+(def fibonacci (n)
+    (if (| (== n 1) (== n 2))
+        (return 1)
+        (else (return (+ (fibonacci (- n 1)) (fibonacci (- n 2)))))
+    )
+)
+
+# Function 2: Power function with loop
+(def power (base exponent)
+    (let result 1)
+    (let i 0)
+    (while (< i exponent)
+        (let result (* result base))
+        (inc i)
+    )
+    (return result)
+)
+
+# Function 3: List processing function that finds the sum of a list
+(def sum_list (lst)
+    (let sum 0)
+    (let i 0)
+    (let size (sizeof lst))
+    (while (< i size)
+        (let sum (+ sum (getid i lst)))
+        (inc i)
+    )
+    (return sum)
+)
+
+# Test function calls
+(print (fibonacci 6))       # Should output 8
+(print (power 2 3))         # Should output 8
+(print (sum_list (list 1 2 3 4 5)))  # Should output 15
+
+# Test nested function calls
+(print (power 2 (fibonacci 3)))  # Should output 2^2 = 4
+(print (fibonacci (power 2 2)))  # Should output fibonacci(4) = 3
+(print (sum_list (list 1 4 3)))  # Should output 8

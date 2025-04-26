@@ -30,16 +30,22 @@ assignment:
 	'let' IDENTIFIER expression
 	| 'let' ( '(' IDENTIFIER expression ')')+;
 
-expression: literal | IDENTIFIER | '(' compoundExpr ')';
+expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
 
 compoundExpr:
 	arithmeticExpr
 	| booleanExpr
+	| logicalExpr
 	| listExpr
 	| callExpr
 	| ifExpr
 	| branchExpr
 	| listOpExpr;
+
+// Allow inc/dec to be used in expressions
+incDecExpr:
+	'inc' IDENTIFIER 
+	| 'dec' IDENTIFIER;
 
 arithmeticExpr:
 	'+' expression+
@@ -56,6 +62,11 @@ booleanExpr:
 	| '<=' expression expression
 	| '>=' expression expression
 	| 'not' expression;
+
+logicalExpr:
+	'&' expression expression   // Logical AND
+	| '|' expression expression  // Logical OR
+	| '!' expression;            // Logical NOT
 
 listExpr: 'list' expression*; // Allow empty lists (list)
 
@@ -110,6 +121,11 @@ literal: INT | FLOAT | BOOL | STRING;
 
 // Keywords as Tokens (matched before IDENTIFIER)
 BOOL: 'true' | 'false';
+
+// Logical operators as tokens
+AND: '&';
+OR: '|';
+NOT: '!';
 
 // Literals
 INT: '-'? [0-9]+;

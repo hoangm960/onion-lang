@@ -1,5 +1,4 @@
 from generated.OnionVisitor import OnionVisitor
-from generated.OnionParser import OnionParser
 import sys
 import os
 from src.symbol_table import SymbolTable
@@ -129,7 +128,7 @@ class BaseInterpreter(OnionVisitor):
         var_name = ctx.IDENTIFIER().getText()
 
         # Lấy giá trị hiện tại
-        current_value = self.env.resolve(var_name)
+        current_value = self._resolve_variable(var_name)
 
         if not isinstance(current_value, (int, float)):
             raise TypeError(
@@ -144,7 +143,7 @@ class BaseInterpreter(OnionVisitor):
             new_value = current_value - 1
 
         # Cập nhật giá trị mới
-        if not self.env.assign(var_name, new_value):
+        if not self._assign_variable(var_name, new_value):
             raise NameError(f"Variable '{var_name}' is not defined")
 
         return new_value
@@ -164,11 +163,14 @@ class BaseInterpreter(OnionVisitor):
         # Nếu không có biểu thức, trả về None
         return ReturnValue(None)
 
-    def execute_block(self, statements, environment):
+    def execute_block(self, statements, environment=None):
         """Thực thi khối lệnh với môi trường cục bộ mới."""
-        previous = self.env
-        try:
+        if environment:
             self.env = environment
+        else:
+            self.env.push_scope()
+            
+        try:
             result = None
             for statement in statements:
                 result = self.visit(statement)
@@ -176,7 +178,8 @@ class BaseInterpreter(OnionVisitor):
                     break
             return result
         finally:
-            self.env = previous
+            if not environment:
+                self.env.pop_scope()
 
     def visitConditionalStmt(self, ctx):
         # Xử lý câu lệnh điều kiện: (if condition then-block [else else-block])
@@ -201,11 +204,30 @@ class ExpressionVisitor(BaseInterpreter):
         """Resolve variable identifier with error handling"""
         var_name = ctx.IDENTIFIER().getText()
         try:
-            return self.env.resolve(var_name)
+            return self._resolve_variable(var_name)
         except NameError as e:
             if var_name in BuiltInFunctions.registry:
                 return BuiltInFunctions.execute(var_name, self, [])
             raise OnionNameError(f"Undefined variable '{var_name}'") from e
+
+    def _resolve_variable(self, name):
+        """Resolve a variable from the environment"""
+        value = self.env.lookup(name)
+        if value is None:
+            raise NameError(f"Variable '{name}' is not defined")
+        return value
+        
+    def _assign_variable(self, name, value):
+        """Assign a value to a variable in the environment"""
+        # Search for the variable in existing scopes
+        found = False
+        for scope in reversed(self.env.scopes):
+            if name in scope:
+                scope[name] = value
+                found = True
+                break
+                
+        return found
 
     def visitExpression(self, ctx):
         if ctx.literal():
@@ -215,6 +237,8 @@ class ExpressionVisitor(BaseInterpreter):
             return self._resolve_identifier(ctx)
         elif ctx.compoundExpr():
             return self.visit(ctx.compoundExpr())
+        elif ctx.incDecExpr():
+            return self.visit(ctx.incDecExpr())
         return None
 
     def visitCompoundExpr(self, ctx):
@@ -222,6 +246,8 @@ class ExpressionVisitor(BaseInterpreter):
             return self.visit(ctx.arithmeticExpr())
         if ctx.booleanExpr():
             return self.visit(ctx.booleanExpr())
+        if ctx.logicalExpr():
+            return self.visit(ctx.logicalExpr())
         if ctx.listExpr():
             return self.visit(ctx.listExpr())
         if ctx.callExpr():
@@ -246,6 +272,32 @@ class ExpressionVisitor(BaseInterpreter):
             token = ctx.BOOL().getText()
             return token == "true"
         return None
+
+    def visitIncDecExpr(self, ctx):
+        """Handle increment/decrement expressions"""
+        op = ctx.getChild(0).getText()
+        var_name = ctx.IDENTIFIER().getText()
+
+        # Get current value
+        current_value = self._resolve_variable(var_name)
+
+        if not isinstance(current_value, (int, float)):
+            raise OnionTypeError(f"Cannot increment/decrement non-numeric value: {current_value}")
+
+        if op == "inc":
+            # Increment: (inc x)
+            new_value = current_value + 1
+        elif op == "dec":
+            # Decrement: (dec x)
+            new_value = current_value - 1
+        else:
+            raise OnionRuntimeError(f"Unknown operation: {op}")
+
+        # Update value and return new value
+        if not self._assign_variable(var_name, new_value):
+            raise OnionNameError(f"Variable '{var_name}' is not defined")
+
+        return new_value
 
 
 class ArithmeticVisitor(ExpressionVisitor):
@@ -335,6 +387,38 @@ class BooleanVisitor(ExpressionVisitor):
             "not": self._handle_not,
         }
         return handlers[op](ctx)
+    
+    def visitLogicalExpr(self, ctx):
+        op = ctx.getChild(0).getText()
+        handlers = {
+            "&": self._handle_and,
+            "|": self._handle_or,
+            "!": self._handle_not_logical
+        }
+        return handlers[op](ctx)
+
+    def _handle_and(self, ctx):
+        # Logical AND: (& expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        # Short-circuit evaluation - if left is falsy, don't evaluate right
+        if not left:
+            return False
+        right = self.visit(ctx.expression(1))
+        return bool(left and right)
+        
+    def _handle_or(self, ctx):
+        # Logical OR: (| expr1 expr2)
+        left = self.visit(ctx.expression(0))
+        # Short-circuit evaluation - if left is truthy, don't evaluate right
+        if left:
+            return True
+        right = self.visit(ctx.expression(1))
+        return bool(left or right)
+        
+    def _handle_not_logical(self, ctx):
+        # Logical NOT: (! expr) - equivalent to (not expr) but keeping both for compatibility
+        value = self.visit(ctx.expression(0))
+        return not bool(value)
 
     def _handle_equal(self, ctx):
         # So sánh bằng: (== expr1 expr2)
@@ -611,182 +695,138 @@ class FunctionVisitor(BaseInterpreter):
         return None
 
     def visitCallExpr(self, ctx):
-        """Xử lý lời gọi hàm"""
-        # Lấy tên hàm từ IDENTIFIER
         name = ctx.IDENTIFIER().getText()
-
+        
+        # Evaluate all arguments
+        args = self._evaluate_arguments(ctx)
         if name in self.macros:
-            return self.visitMacroCall(ctx)
-
-        # Len Function
-        if name == "len":
-            args = []
-            for i in range(1, ctx.getChildCount()):
-                args.append(ctx.getChild(i))
-            if len(args) != 1:
-                raise ValueError(f"len expected 1 argument, got {len(args)}")
-            value = self.visit(args[0])
-            if isinstance(value, (list, str)):
-                return len(value)
-            else:
-                raise TypeError(
-                    f"len expects string or list, got {type(value).__name__}"
-                )
-
-        # Type checking
-        if name == "typeof":
-            if len(ctx.expression()) != 1:
-                raise ValueError("typeof requires exactly one argument")
-            value = self.visit(ctx.expression(0))
-            if isinstance(value, int):
-                return "int"
-            elif isinstance(value, float):
-                return "float"
-            elif isinstance(value, str):
-                return "string"
-            elif isinstance(value, bool):
-                return "bool"
-            elif isinstance(value, list):
-                return "list"
-
-        if name not in self.functions:
-            raise NameError(f"Function '{name}' is not defined")
-
-        # Lấy định nghĩa hàm
+            return self._handle_macro_call(ctx, name, args)
+            
+        if name in BuiltInFunctions.registry:
+            return BuiltInFunctions.execute(name, self, args)
+        
+        elif name == "typeof":
+            return self._handle_typeof(args)
+            
+        if name in self.functions:
+            return self._handle_function_call(ctx, name, args)
+            
+        # Function not found
+        raise OnionNameError(f"Function '{name}' is not defined")
+            
+    def _handle_typeof(self, args):
+        """Handle the built-in typeof function"""
+        if len(args) != 1:
+            raise OnionArgumentError("typeof requires exactly one argument")
+        value = args[0]
+        if isinstance(value, int):
+            return "int"
+        elif isinstance(value, float):
+            return "float"
+        elif isinstance(value, str):
+            return "string"
+        elif isinstance(value, bool):
+            return "bool"
+        elif isinstance(value, list):
+            return "list"
+        else:
+            return "unknown"
+    
+    def _handle_function_call(self, ctx, name, args=None):
+        """Handle execution of a user-defined function"""
         function_def = self.functions[name]
         params = function_def["params"]
         body = function_def["body"]
 
-        # Đánh giá các đối số
-        args = []
+        # Use provided args or evaluate them if not provided
+        if args is None:
+            args = self._evaluate_arguments(ctx)
 
-        # Lấy các biểu thức đối số
-        expressions = []
-        for i in range(ctx.getChildCount()):
-            if i > 0:  # Bỏ qua tên hàm
-                expressions.append(ctx.getChild(i))
-
-        for i, expr in enumerate(expressions):
-            try:
-                arg_value = self.visit(expr)
-                args.append(arg_value)
-            except Exception as e:
-                raise ValueError(f"Error evaluating argument {i+1}: {e}")
-
-        # Kiểm tra số lượng đối số
+        # Validate argument count
         if len(args) != len(params):
-            raise ValueError(
+            raise OnionArgumentError(
                 f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
             )
 
-        # Lưu trữ phạm vi biến hiện tại
-        previous_env = self.env
+        # Create a new scope for function execution
+        self.env.push_scope()
+        
+        try:
+            # Define parameters in the new scope
+            for i, param in enumerate(params):
+                self.env.define(param, args[i])
 
-        # Tạo phạm vi biến mới cho lời gọi hàm
-        function_env = SymbolTable(previous_env)
-
-        # Nếu là hàm factorial, thêm sẵn các biến khai báo trong thân hàm
-        if name == "factorial":
-            function_env.define("n", args[0])
-            function_env.define("result", 1)
-            function_env.define("i", 1)
-            self.env = function_env
-
-            # Bỏ qua 2 khai báo đầu tiên và chỉ thực thi phần còn lại
+            # Execute the function body
             result = None
-            for i in range(2, body.getChildCount()):
+            for i in range(body.getChildCount()):
                 stmt = body.getChild(i)
                 stmt_result = self.visit(stmt)
+                
                 if isinstance(stmt_result, ReturnValue):
                     result = stmt_result.value
                     break
                 elif stmt_result is not None:
                     result = stmt_result
-
-            # Khôi phục môi trường
-            self.env = previous_env
+                    
             return result
-        else:
-            # Trường hợp hàm thông thường
-            for i, param in enumerate(params):
-                function_env.define(param, args[i])
+        finally:
+            # Restore previous scope
+            self.env.pop_scope()
 
-            # Thực thi thân hàm
-            result = None
-
-            if body:
-                try:
-                    # Thiết lập môi trường mới
-                    self.env = function_env
-
-                    # Thực thi từng câu lệnh trong thân hàm
-                    for i in range(body.getChildCount()):
-                        stmt = body.getChild(i)
-                        stmt_result = self.visit(stmt)
-
-                        # Kiểm tra nếu kết quả là ReturnValue
-                        if isinstance(stmt_result, ReturnValue):
-                            result = stmt_result.value
-                            break
-                        elif stmt_result is not None:
-                            result = stmt_result
-
-                    if (
-                        result is None
-                        and "stmt_result" in locals()
-                        and isinstance(stmt_result, ReturnValue)
-                    ):
-                        result = stmt_result.value
-
-                except Exception as e:
-                    raise e
-                finally:
-                    # Khôi phục môi trường cũ
-                    self.env = previous_env
-
-            return result
-
-    def visitMacroCall(self, ctx):
-        macro_name = ctx.IDENTIFIER().getText()
-
-        if macro_name not in self.macros:
-            raise NameError(f"Macro '{macro_name}' is not defined")
-
+    def _handle_macro_call(self, ctx, macro_name=None, args=None):
+        """Handle execution of a macro"""
+        if macro_name is None:
+            macro_name = ctx.IDENTIFIER().getText()
+            
         macro_def = self.macros[macro_name]
         params = macro_def["params"]
         body = macro_def["body"]
 
-        args = []
-        for expr in ctx.expression():
-            arg_value = self.visit(expr)
-            args.append(arg_value)
+        # Use provided args or evaluate them if not provided
+        if args is None:
+            args = self._evaluate_arguments(ctx)
 
+        # Validate argument count
         if len(args) != len(params):
-            raise ValueError(
+            raise OnionArgumentError(
                 f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}"
             )
 
-        previous_env = self.env
-        macro_env = SymbolTable(previous_env)
-
-        for i, param in enumerate(params):
-            macro_env.define(param, args[i])
-
-        result = None
+        # Create a new scope for macro execution
+        self.env.push_scope()
+        
         try:
-            self.env = macro_env
+            # Define parameters in the new scope
+            for i, param in enumerate(params):
+                self.env.define(param, args[i])
+
+            # Execute the macro body
+            result = None
             for i in range(body.getChildCount()):
                 stmt = body.getChild(i)
                 stmt_result = self.visit(stmt)
+                
                 if isinstance(stmt_result, ReturnValue):
                     result = stmt_result.value
                     break
                 elif stmt_result is not None:
                     result = stmt_result
+                    
+            return result
         finally:
-            self.env = previous_env
-
-        return result
+            # Restore previous scope
+            self.env.pop_scope()
+            
+    def _evaluate_arguments(self, ctx):
+        """Evaluate function call arguments"""
+        args = []
+        for expr in ctx.expression():
+            try:
+                arg_value = self.visit(expr)
+                args.append(arg_value)
+            except Exception as e:
+                raise OnionRuntimeError(f"Error evaluating argument: {e}")
+        return args
 
 
 class Interpreter(

@@ -1,0 +1,70 @@
+# Binary Search implementation in Onion Language
+# Tests recursive function calls, conditionals, and list operations
+
+# Binary search function that returns the index of target in the list, or -1 if not found
+(def binary_search (lst low high target)
+    # Base case: not found
+    (if (> low high)
+        (return -1)
+        (else
+            # Calculate middle index
+            (let mid (// (+ low high) 2))
+            
+            # Get middle value
+            (let mid_value (getid mid lst))
+            
+            # Check if found
+            (if (== mid_value target)
+                (return mid)
+                (else
+                    # Check if target is in left or right half
+                    (if (< target mid_value)
+                        # Search left half
+                        (return (binary_search lst low (- mid 1) target))
+                        (else
+                            # Search right half
+                            (return (binary_search lst (+ mid 1) high target))
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+# Helper function to search entire list
+(def search (lst target)
+    (let size (sizeof lst))
+    (if (== size 0)
+        (return -1)
+        (else
+            (return (binary_search lst 0 (- size 1) target))
+        )
+    )
+)
+
+# Test cases
+(let sorted_list (list 1 3 5 7 9 11 13 15 17 19))
+(print (list 1 3 5 7 9 11 13 15 17 19))  # Print the list for reference
+
+# Test successful searches
+(print (search sorted_list 1))   # Should return 0 (first element)
+(print (search sorted_list 11))  # Should return 5 (middle element)
+(print (search sorted_list 19))  # Should return 9 (last element)
+
+# Test unsuccessful searches
+(print (search sorted_list 0))   # Should return -1 (smaller than all elements)
+(print (search sorted_list 6))   # Should return -1 (between existing elements)
+(print (search sorted_list 20))  # Should return -1 (larger than all elements)
+
+# Test with empty list
+(print (search (list) 5))        # Should return -1
+
+# Test with a different list
+(let primes (list 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47))
+(print (search primes 17))       # Should return 6
+(print (search primes 42))       # Should return -1 (not in list)
+
+# Test with advanced case - nested function calls
+(let indices (list 0 2 4 6 8))
+(print (search indices (search sorted_list 9)))  # Should find 9 at index 4, then find 4 at index 2 

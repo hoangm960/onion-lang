@@ -1,0 +1,28 @@
+// Test các thao tác với danh sách đơn giản
+
+// Tạo các danh sách
+(let arr1 (list 1 2 3 4 5))
+(let arr2 (list 10 20 30))
+(let arr3 (list 100 200 300 400))
+(let empty (list))
+
+// Test thao tác head
+(print (head arr1))
+(print (head arr2))
+(print (head arr3))
+
+// Test thao tác tail
+(print (tail arr1))
+(print (tail arr2))
+(print (tail arr3))
+
+// Test thao tác getid
+(print (getid 0 arr1))
+(print (getid 1 arr2))
+(print (getid 2 arr3))
+
+// Test thao tác sizeof
+(print (sizeof arr1))
+(print (sizeof arr2))
+(print (sizeof arr3))
+(print (sizeof empty)) 

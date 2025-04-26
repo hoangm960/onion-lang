@@ -1,0 +1,35 @@
+# Test logical operators in Onion language
+
+# AND operator
+(print (& true true))       # Should print: true
+(print (& true false))      # Should print: false
+(print (& false true))      # Should print: false
+(print (& false false))     # Should print: false
+
+# OR operator
+(print (| true true))       # Should print: true
+(print (| true false))      # Should print: true
+(print (| false true))      # Should print: true
+(print (| false false))     # Should print: false
+
+# NOT operator (both variants)
+(print (! true))            # Should print: false
+(print (! false))           # Should print: true
+(print (not true))          # Should print: false
+(print (not false))         # Should print: true
+
+# Short-circuit evaluation test
+(let x 0)
+(print (| true (inc x)))    # Should print: true, but x should still be 0 due to short-circuit
+(print x)                   # Should print: 0
+
+(print (& false (inc x)))   # Should print: false, but x should still be 0 due to short-circuit
+(print x)                   # Should print: 0
+
+# Complex logical expressions
+(let a true)
+(let b false)
+(let c true)
+
+(print (& (| a b) c))       # Should print: true
+(print (! (& a b)))         # Should print: true 

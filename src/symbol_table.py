@@ -2,28 +2,28 @@ class SymbolTable:
     """Bảng ký hiệu phân cấp để quản lý phạm vi biến."""
 
     def __init__(self, parent=None):
-        self.symbols = {}  # lưu trữ biến ở phạm vi hiện tại
-        self.parent = parent  # bảng ký hiệu phạm vi cha
+        self.global_scope = {}  # lưu trữ biến ở phạm vi hiện tại
+        self.scopes = [self.global_scope]  # bảng ký hiệu phạm vi cha
 
+    # Get the current scope from top of stack
+    def current_scope(self):
+        return self.scopes[-1]
+
+    # Enter a new scope by pushing an empty dictionary onto the stack
+    def push_scope(self):
+        self.scopes.append({})
+
+    # Exit the current scope
+    def pop_scope(self):
+        self.scopes.pop()
+
+    # Define a new symbol in the current scope
     def define(self, name, value):
-        """Định nghĩa một biến trong phạm vi hiện tại."""
-        self.symbols[name] = value
+        self.current_scope()[name] = value
 
-    def resolve(self, name):
-        """Tìm giá trị của biến trong các phạm vi lồng nhau."""
-        if name in self.symbols:
-            return self.symbols[name]
-        elif self.parent:
-            return self.parent.resolve(name)
-        else:
-            raise NameError(f"Variable '{name}' is not defined")
-
-    def assign(self, name, value):
-        """Gán giá trị cho biến đã tồn tại."""
-        if name in self.symbols:
-            self.symbols[name] = value
-            return True
-        elif self.parent:
-            return self.parent.assign(name, value)
-        else:
-            return False
+    # Lookup a symbol from the top scope down to the global
+    def lookup(self, name):
+        for scope in reversed(self.scopes):
+            if name in scope:
+                return scope[name]
+        return None

@@ -1,0 +1,20 @@
+// Test vòng lặp repeat
+(let count 5)
+(repeat 3 (
+    (print "Repeating...")
+    (print count)
+))
+
+// Test vòng lặp loop
+(print "Testing loop with range:")
+(loop i range (1 5 1) (
+    (print i)
+))
+
+// Test vòng lặp while
+(let x 1)
+(print "Testing while loop:")
+(while (< x 5) (
+    (print x)
+    (let x (+ x 1))
+)) 

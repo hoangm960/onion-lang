@@ -22,38 +22,48 @@ onion-lang/
 │   ├── __init__.py
 │   ├── parser.py        # Module to load parser
 │   ├── interpreter.py   # Module for interpreter
-│   ├── repl.py          # Read-Evaluate-Print Loop
-│   └── utils.py
+│   ├── symbol_table.py  # Symbol table implementation 
+│   ├── exceptions.py    # Custom exceptions
+│   ├── builtins.py      # Built-in functions
+│   └── repl.py          # Read-Evaluate-Print Loop
 ├── tests/
-│   └── parsers/
-│       ├── input/
-│       │   ├── input1.onion
-│       │   └── input2.onion
-│       └── output/
-│           ├── output1.onion
-│           └── output2.onion
+│   ├── input/           # Test files go here
+│   │   ├── function_test.onion
+│   │   ├── binary_search_test.onion
+│   │   └── logical_test.onion
+│   └── output/          # Generated ASTs are saved here
+│       ├── function_test.ast.txt
+│       └── binary_search_test.ast.txt
 ├── main.py              # Main file to run repl
-├── test.py              # Unittest
 ├── README.md
 └── requirements.txt
 ```
 ## Grammar
-### Test grammar
-Input your test file in *tests/parsers/inputs/*
+### Running Tests
+The test files should be placed in the `tests/input/` directory. You can run them directly from the REPL:
+
 ```bash
-python test_parser.py
+python main.py
 ```
-To test 1 test file:
+
+To test a specific file:
 ```bash
->>> run [filename].txt
+>>> run binary_search_test
 ```
-To test all test files:
+
+This will automatically:
+1. Look for the file in `tests/input/` folder
+2. Add the `.onion` extension if you didn't specify it
+3. Run the file
+4. Generate an AST (Abstract Syntax Tree) representation in `tests/output/`
+
+You can also run a file directly from the command line:
 ```bash
->>> runall
+python main.py binary_search_test
 ```
-Outputs of the test cases will be displayed at the terminal and saved to *tests/parsers/outputs/* 
-### Fix grammar
-The grammar file located at: *grammar/Onion.g4*. After fixing, run:
+
+### Regenerating the Parser
+The grammar file is located at: `grammar/Onion.g4`. After making changes, regenerate the parser:
 ```bash
 antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
 ```
@@ -69,11 +79,40 @@ python main.py
 ### REPL Commands:
 
 - `help`: Display usage instructions and code examples
-- `run <filename>`: Execute a specific Onion file (can be a relative or absolute path)
-  - Example: `run arithmetic.onion` or `run tests/parsers/input/arithmetic.onion`
-- `run <filename> -s` or `run <filename> --save`: Run a file and save the results to the tests/parsers/output/ directory
-- `runall`: Run all .onion files in the tests/parsers/input directory and save results to the tests/parsers/output/ directory
+- `run <filename>`: Execute an Onion file
+  - If only a filename is provided, it looks in `tests/input/` directory
+  - Example: `run binary_search_test` runs `tests/input/binary_search_test.onion`
+  - You can also provide a full path: `run /path/to/your/file.onion`
 - `clear`: Clear the terminal screen
 - `exit` or `quit`: Exit the REPL
 
 ### Onion Code Examples:
+```
+# Variable assignment
+(let x 5)
+
+# Arithmetic
+(+ x 10)
+(* 2 3 4)
+(- 10 5)
+(/ 10 2)
+(// 10 3)  # Integer division
+
+# Boolean operations
+(== 5 5)
+(< 3 6)
+(& true false)  # Logical AND
+(| false true)  # Logical OR
+(! true)        # Logical NOT
+
+# Conditionals
+(if (> x 0) (print "Positive") (else (print "Non-positive")))
+
+# Functions
+(def add (a b)
+    (return (+ a b)))
+(print (add 3 4))
+
+# Lists
+(let mylist (list 1 2 3 4 5))
+(print (getid 2 mylist))  # Get element at index 2
