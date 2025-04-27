@@ -1,0 +1,65 @@
+# LeetCode #11: Container With Most Water (Medium)
+# Problem: Given n non-negative integers representing heights,
+# find the container that holds the most water (maximum area)
+
+# Function to find the maximum area container
+(def max_water (heights)
+    # Initialize variables
+    (let size (sizeof heights))
+    (let res 0)
+    (let left 0)
+    (let right (- size 1))
+    
+    # Two-pointer approach
+    (while (< left right)
+        # Get heights at current positions
+        (let left_height (getid left heights))
+        (let right_height (getid right heights))
+        
+        # Calculate width and min height
+        (let width (- right left))
+        (let min_height (if (< left_height right_height) left_height : right_height))
+        
+        # Calculate area and update res if larger
+        (let area (* width min_height))
+        (if (> area res)
+            (let res area)
+        )
+        
+        # Move pointers - we move the pointer with smaller height
+        (if (< left_height right_height)
+            (inc left)
+            (else (dec right))
+        )
+    )
+    
+    (return res)
+)
+
+# Test case 1: [1,8,6,2,5,4,8,3,7]
+# Expected output: 49 (between heights 8 and 7)
+(let heights1 (list 1 8 6 2 5 4 8 3 7))
+(print "Test Case 1:")
+(print heights1)
+(print (max_water heights1))
+
+# Test case 2: [1,1]
+# Expected output: 1
+(let heights2 (list 1 1))
+(print "Test Case 2:")
+(print heights2)
+(print (max_water heights2))
+
+# Test case 3: [4,3,2,1,4]
+# Expected output: 16
+(let heights3 (list 4 3 2 1 4))
+(print "Test Case 3:")
+(print heights3)
+(print (max_water heights3))
+
+# Test case 4: [1,2,1]
+# Expected output: 2
+(let heights4 (list 1 2 1))
+(print "Test Case 4:")
+(print heights4)
+(print (max_water heights4)) 

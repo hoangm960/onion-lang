@@ -89,6 +89,8 @@ ONION REPL COMMANDS:
                         
 - clear                : Clear the terminal screen
                         
+- reset                : Reset the interpreter state (clear memory)
+
 - help                 : Show this help message
 
 - exit, quit           : Exit the REPL
@@ -129,6 +131,9 @@ def main():
                 show_help()
             elif line.lower() == "clear":
                 clear_screen()
+            elif line.lower() == "reset":
+                interpreter = Interpreter() # Re-initialize the interpreter
+                print("Interpreter state has been reset.")
             elif line.lower().startswith("run "):
                 # Extract filename from command
                 filename = line[4:].strip()

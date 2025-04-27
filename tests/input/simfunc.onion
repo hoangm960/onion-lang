@@ -1,0 +1,9 @@
+(def simfunc()
+    (let res 0)
+    (while (< res 10)
+        (inc res)
+    )
+    (return res)
+)
+
+(print (simfunc))

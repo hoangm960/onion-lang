@@ -1,0 +1,52 @@
+# Problem: Combination Sum (LeetCode 39)
+#
+# Given an array of distinct integer candidates and a target integer target,
+# return a list of all unique combinations of candidates where the chosen
+# numbers sum to target.
+# You may return the combinations in any order.
+#
+# The same number may be chosen from candidates an unlimited number of times.
+# Two combinations are unique if the frequency of at least one of the chosen
+# numbers is different.
+#
+# Example:
+# candidates = [2, 3, 6, 7], target = 7
+# Output: [[2, 2, 3], [7]]
+#
+# candidates = [2, 3, 5], target = 8
+# Output: [[2, 2, 2, 2], [2, 3, 3], [3, 5]]
+
+(def combinationSum(candidates target)
+    (let result (list))
+    (let current (list))
+    
+    (def backtrack(start target)
+        (if (== target 0)
+            ; Found a combination, append a COPY of current to result
+            (append result (copy current)) ; Assumes a 'copy' function exists
+            ; No return needed here, just proceed after adding the combination
+            ((else
+                (if (> target 0)
+                    (loop i start (sizeof candidates)
+                        (append current (getid i candidates))
+                        (backtrack i (- target (getid i candidates)))
+                        (let current (tail current))
+                    )
+                )
+            ))
+        )
+    )
+    
+    (backtrack 0 target)
+    (return result)
+)
+
+; Test case 1: candidates = [2,3,6,7], target = 7
+(let candidates (list 2 3 6 7))
+(let target 7)
+(print (combinationSum candidates target))  ; Should print [[2,2,3], [7]]
+
+; Test case 2: candidates = [2,3,5], target = 8
+(let candidates (list 2 3 5))
+(let target 8)
+(print (combinationSum candidates target))  ; Should print [[2,2,2,2], [2,3,3], [3,5]] 

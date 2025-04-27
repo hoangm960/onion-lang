@@ -10,7 +10,7 @@ class BuiltInFunctions:
     def register_defaults(cls):
         cls.register("len", cls._len)
         cls.register("typeof", cls._typeof)
-        cls.register("factorial", cls._factorial)
+        cls.register("copy", cls._copy)
 
     @classmethod
     def register(cls, name, func):
@@ -50,18 +50,14 @@ class BuiltInFunctions:
             return "list"
         return type(value).__name__
 
+
     @staticmethod
-    def _factorial(interpreter, args):
+    def _copy(interpreter, args):
+        """Built-in copy function for lists."""
         if len(args) != 1:
-            raise OnionArgumentError(f"factorial() expects 1 argument, got {len(args)}")
-        n = args[0]
-        if not isinstance(n, int):
-            raise OnionTypeError(
-                f"factorial() requires an integer, got {type(n).__name__}"
-            )
-        if n < 0:
-            raise OnionArgumentError("factorial() argument must be non-negative")
-        result = 1
-        for i in range(1, n + 1):
-            result *= i
-        return result
+            raise OnionArgumentError(f"copy() expects 1 argument, got {len(args)}")
+        value = args[0]
+        if isinstance(value, list):
+            return value[:]  # Return a shallow copy
+        # Can optionally add support for copying other types if needed
+        raise OnionTypeError(f"copy() currently only supports lists, got {type(value).__name__}")

@@ -1,0 +1,42 @@
+# AST for assignment2.onion
+
+program:
+ statement:
+  statementType:
+   assignment:
+    let:
+    a:
+    expression:
+     literal:
+      4
+ statement:
+  statementType:
+   assignment:
+    let:
+    b:
+    expression:
+     literal:
+      5
+ statement:
+  statementType:
+   assignment:
+    let:
+    c:
+    expression:
+     compoundExpr:
+      ternaryExpr:
+       if:
+       expression:
+        compoundExpr:
+         booleanExpr:
+          >:
+          expression:
+           a
+          expression:
+           b
+       expression:
+        a
+       ::
+       expression:
+        b
+ <EOF>
