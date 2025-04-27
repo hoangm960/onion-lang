@@ -27,8 +27,8 @@ incDecStmt:
 	| 'dec' IDENTIFIER; // Decrement: (dec x)
 
 assignment:
-	'let' IDENTIFIER expression
-	| 'let' ( '(' IDENTIFIER expression ')')+;
+	'let' IDENTIFIER (expression | ternaryExpr)
+	| 'let' ( '(' IDENTIFIER (expression | ternaryExpr) ')')+;
 
 expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
 
@@ -40,7 +40,8 @@ compoundExpr:
 	| callExpr
 	| ifExpr
 	| branchExpr
-	| listOpExpr;
+	| listOpExpr
+	| ternaryExpr;
 
 // Allow inc/dec to be used in expressions
 incDecExpr:
@@ -101,7 +102,7 @@ loopStatement:
 listOpExpr:
 	'head' expression
 	| 'tail' expression
-	| 'getid' expression expression
+	| 'getid' expression expression //getid index list
 	| 'sizeof' expression;
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
@@ -127,6 +128,9 @@ AND: '&';
 OR: '|';
 NOT: '!';
 
+// Explicit Colon Token
+COLON: ':';
+
 // Literals
 INT: '-'? [0-9]+;
 FLOAT: '-'? [0-9]* '.' [0-9]+;
@@ -139,3 +143,6 @@ IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 WS: [ \t\r\n]+ -> skip;
 COMMENT: '/*' .*? '*/' -> skip; // Non-greedy match
 LINE_COMMENT: '#' ~[\r\n]* -> skip;
+
+ternaryExpr:
+	'if' expression expression COLON expression;

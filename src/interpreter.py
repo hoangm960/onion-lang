@@ -1,4 +1,5 @@
 from generated.OnionVisitor import OnionVisitor
+from generated.OnionParser import OnionParser
 import sys
 import os
 from src.symbol_table import SymbolTable
@@ -72,29 +73,60 @@ class BaseInterpreter(OnionVisitor):
             raise OnionPrintError from e
 
     def visitAssignment(self, ctx):
-        if ctx.getChildCount() == 3:  # 'let' IDENTIFIER expression
-            # Dạng đơn giản: let a 2
-            identifier = ctx.getChild(1).getText()
-            value = self.visit(ctx.getChild(2))
-            # print(f"Debug: {value}")
-            self.env.define(identifier, value)
-            return value
-        else:
+        # Check the second child to distinguish assignment types
+        second_child = ctx.getChild(1)
+
+        # Case 1: Multi-assignment like 'let (a 1) (b 2)'
+        # The second child is '('
+        if isinstance(second_child, TerminalNode) and second_child.getText() == '(':
             # Dạng nhiều biến: let (a 1) (b 2)
             result = None
-            # Bắt đầu từ vị trí 1 (sau 'let')
+            # Start from index 1 (the first '(')
             i = 1
             while i < ctx.getChildCount():
-                if ctx.getChild(i).getText() == "(":
-                    # Mỗi cặp biến-giá trị có dạng '(' IDENTIFIER expression ')'
-                    pair = ctx.getChild(i)
-                    if pair.getChildCount() == 4:  # '(', IDENTIFIER, expression, ')'
-                        var_name = pair.getChild(1).getText()
-                        var_value = self.visit(pair.getChild(2))
-                        self.env.define(var_name, var_value)
-                        result = var_value
-                i += 1
-            return result
+                 # Check if the current child is an opening parenthesis indicating a pair
+                if isinstance(ctx.getChild(i), TerminalNode) and ctx.getChild(i).getText() == "(":
+                    # A pair starts at index i, id is at i+1, expr is at i+2, ) is at i+3
+                    if i + 3 < ctx.getChildCount():
+                        var_name_node = ctx.getChild(i+1)
+                        expr_node = ctx.getChild(i+2)
+                        closing_paren = ctx.getChild(i+3)
+
+                        # Basic structural check for '(' IDENTIFIER (expression | ternaryExpr) ')'
+                        if isinstance(var_name_node, TerminalNode) and ctx.parser.ruleNames[var_name_node.symbol.type -1] == 'IDENTIFIER' and \
+                           (isinstance(expr_node, OnionParser.ExpressionContext) or isinstance(expr_node, OnionParser.TernaryExprContext)) and \
+                           isinstance(closing_paren, TerminalNode) and closing_paren.getText() == ')':
+
+                            var_name = var_name_node.getText()
+                            var_value = self.visit(expr_node)
+                            self.env.define(var_name, var_value)
+                            result = var_value # Keep track of the last assigned value
+                            i += 3 # Move index past the processed pair ')'
+                        else:
+                             raise OnionRuntimeError(f"Malformed multi-assignment pair starting near index {i}")
+                    else:
+                        raise OnionRuntimeError(f"Incomplete multi-assignment pair starting near index {i}")
+                
+                i += 1 # Move to the next child, checking if it starts a pair
+            return result # Return the value of the last assignment in the multi-let
+
+        # Case 2: Single or Conditional assignment: 'let' IDENTIFIER ...
+        # The second child is an IDENTIFIER
+        elif isinstance(second_child, TerminalNode) and second_child.symbol.type == OnionParser.IDENTIFIER:
+             identifier = second_child.getText() # Get identifier text
+             expressions = ctx.expression() # Get all expression nodes
+
+             if len(expressions) == 1: # Simple assignment: let x expr
+                 value = self.visit(expressions[0])
+                 self.env.define(identifier, value)
+                 return value
+             else:
+                 # Should not happen based on the grammar if single/conditional
+                 raise OnionRuntimeError(f"Unexpected number of expressions ({len(expressions)}) in single/conditional assignment for '{identifier}'")
+        else:
+            # This case should theoretically not be reachable if the grammar is correct
+            # and the input parses successfully.
+            raise OnionRuntimeError("Unrecognized assignment structure")
 
     def visitBlock(self, ctx):
         """Xử lý block các câu lệnh"""
@@ -118,40 +150,33 @@ class BaseInterpreter(OnionVisitor):
         var_name = ctx.IDENTIFIER().getText()
 
         # Lấy giá trị hiện tại
-        current_value = self._resolve_variable(var_name)
+        current_value = self.env.lookup(var_name)
+        if current_value is None:
+            raise OnionNameError(f"Variable '{var_name}' is not defined")
 
         if not isinstance(current_value, (int, float)):
             raise OnionTypeError(
                 f"Cannot increment/decrement non-numeric value: {current_value}"
             )
 
-        new_value = current_value
+        # Calculate new value
         if op == "inc":
-            # Tăng biến lên 1: (inc x)
-            new_value += 1
+            new_value = current_value + 1
         elif op == "dec":
-            # Giảm biến đi 1: (dec x)
-            new_value -= 1
+            new_value = current_value - 1
+        else:
+            raise OnionRuntimeError(f"Unknown operation: {op}")
 
-        # Cập nhật giá trị mới
-        if not self._assign_variable(var_name, new_value):
-            raise NameError(f"Variable '{var_name}' is not defined")
-
+        # Update value in environment
+        self.env.define(var_name, new_value)
         return new_value
 
     def visitReturnStmt(self, ctx):
         """Xử lý lệnh return trong hàm"""
-        # Lấy trực tiếp biểu thức sau từ khóa 'return'
         if ctx.getChildCount() > 1:
             expr = ctx.getChild(1)  # Phần tử thứ 2 (index 1) sau 'return'
-
-            value = self.visit(expr)
-
-            # Đánh dấu đây là giá trị return
-            return_value = ReturnValue(value)
-            return return_value
-
-        # Nếu không có biểu thức, trả về None
+            value = self.visit(expr) # Triggers lookup if expr is identifier
+            return ReturnValue(value)
         return ReturnValue(None)
 
     def execute_block(self, statements, environment=None):
@@ -186,28 +211,22 @@ class BaseInterpreter(OnionVisitor):
             else:
                 result = None
 
-        for child in node.getChildren():
-            # skip tokens like EOF or punctuation
-            if isinstance(child, TerminalNode) or isinstance(child, ErrorNode):
-                continue
-
-            # accept(self) will dispatch to your visitXxx methods correctly
-            res = child.accept(self)
-            if res is not None:
-                result = res
-
         return result
 
 
 class ExpressionVisitor(BaseInterpreter):
     def _resolve_identifier(self, ctx):
         var_name = ctx.IDENTIFIER().getText()
-        try:
-            return self._resolve_variable(var_name)
-        except NameError as e:
-            if var_name in BuiltInFunctions.registry:
-                return BuiltInFunctions.execute(var_name, self, [])
-            raise OnionNameError(f"Undefined variable '{var_name}'") from e
+        value = self.env.lookup(var_name)
+
+        if value is not None:
+            # Variable found in the environment
+            return value
+        else:
+            # Variable not found in environment scopes.
+            # Built-in functions are handled by visitCallExpr.
+            # If it's not in the environment, it's undefined in this context.
+            raise OnionNameError(f"Undefined variable '{var_name}'")
 
     def _resolve_variable(self, name):
         """Resolve a variable from the environment"""
@@ -255,6 +274,8 @@ class ExpressionVisitor(BaseInterpreter):
             return self.visit(ctx.ifExpr())
         if ctx.branchExpr():
             return self.visit(ctx.branchExpr())
+        if ctx.ternaryExpr():
+            return self.visit(ctx.ternaryExpr())
         if ctx.listOpExpr():
             return self.visit(ctx.listOpExpr())
         return None
@@ -278,7 +299,9 @@ class ExpressionVisitor(BaseInterpreter):
         var_name = ctx.IDENTIFIER().getText()
 
         # Get current value
-        current_value = self._resolve_variable(var_name)
+        current_value = self.env.lookup(var_name)
+        if current_value is None:
+            raise OnionNameError(f"Variable '{var_name}' is not defined")
 
         if not isinstance(current_value, (int, float)):
             raise OnionTypeError(f"Cannot increment/decrement non-numeric value: {current_value}")
@@ -293,9 +316,7 @@ class ExpressionVisitor(BaseInterpreter):
             raise OnionRuntimeError(f"Unknown operation: {op}")
 
         # Update value and return new value
-        if not self._assign_variable(var_name, new_value):
-            raise OnionNameError(f"Variable '{var_name}' is not defined")
-
+        self.env.define(var_name, new_value)
         return new_value
 
 
@@ -576,6 +597,19 @@ class ConditionalVisitor(BaseInterpreter):
                 f"Condition in '{construct}' must be boolean, got {type(value).__name__}"
             )
 
+    def visitTernaryExpr(self, ctx):
+        """Handle ternary expression: (if condition true_expr : false_expr)"""
+        # Children: 'if', condition_expr, true_expr, ':', false_expr
+        condition = self.visit(ctx.expression(0))
+
+        if not isinstance(condition, bool):
+            raise OnionTypeError(f"Ternary expression requires a boolean condition, got {type(condition).__name__}")
+
+        if condition:
+            return self.visit(ctx.expression(1)) # Evaluate true expression
+        else:
+            return self.visit(ctx.expression(2)) # Evaluate false expression
+
 
 class LoopVisitor(BaseInterpreter):
     def visitLoopStatement(self, ctx):
@@ -719,45 +753,42 @@ class FunctionVisitor(BaseInterpreter):
             return "unknown"
     
     def _handle_function_call(self, ctx, name, args=None):
-        """Handle execution of a user-defined function"""
         function_def = self.functions[name]
         params = function_def["params"]
         body = function_def["body"]
 
-        # Use provided args or evaluate them if not provided
         if args is None:
             args = self._evaluate_arguments(ctx)
 
-        # Validate argument count
         if len(args) != len(params):
             raise OnionArgumentError(
                 f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
             )
 
-        # Create a new scope for function execution
         self.env.push_scope()
         
-        try:
-            # Define parameters in the new scope
-            for i, param in enumerate(params):
-                self.env.define(param, args[i])
+        current_scope = self.env.current_scope()
+        # Define parameters directly in the new scope
+        for i, param in enumerate(params):
+            current_scope[param] = args[i]
 
-            # Execute the function body
-            result = None
-            for i in range(body.getChildCount()):
-                stmt = body.getChild(i)
-                stmt_result = self.visit(stmt)
-                
-                if isinstance(stmt_result, ReturnValue):
-                    result = stmt_result.value
-                    break
-                elif stmt_result is not None:
-                    result = stmt_result
-                    
-            return result
-        finally:
-            # Restore previous scope
-            self.env.pop_scope()
+        final_return_value = None
+        # Execute the function body statement by statement
+        for i in range(body.getChildCount()):
+            stmt = body.getChild(i)
+            stmt_result = self.visit(stmt) # This might return a ReturnValue object
+            
+            if isinstance(stmt_result, ReturnValue):
+                final_return_value = stmt_result.value # Extract the actual value
+                break # Exit the loop immediately upon return
+            elif stmt_result is not None:
+                # If no explicit return, the value of the last statement is used (like Lisp)
+                final_return_value = stmt_result
+
+        # The scope is still present here, after body execution / return detection
+        self.env.pop_scope()
+
+        return final_return_value # Return the determined value
 
     def _handle_macro_call(self, ctx, macro_name=None, args=None):
         """Handle execution of a macro"""
@@ -815,21 +846,25 @@ class FunctionVisitor(BaseInterpreter):
         return args
 
 class Interpreter(
-    ArithmeticVisitor,
-    BooleanVisitor,
-    ListVisitor,
-    ConditionalVisitor,
-    LoopVisitor,
-    FunctionVisitor,
+    # BaseInterpreter is inherited via other visitors
+    ArithmeticVisitor,  # Inherits ExpressionVisitor -> BaseInterpreter
+    BooleanVisitor,     # Inherits ExpressionVisitor -> BaseInterpreter
+    ListVisitor,        # Inherits BaseInterpreter
+    ConditionalVisitor, # Inherits BaseInterpreter
+    LoopVisitor,        # Inherits BaseInterpreter
+    FunctionVisitor     # Inherits BaseInterpreter
 ):
     def __init__(self):
+        # Ensure super().__init__() calls the correct chain
         super().__init__()
+        # Initialize environment and built-ins specifically for Interpreter instance
         self.env = SymbolTable()
         BuiltInFunctions.register_defaults()
 
     def visit(self, tree):
         """Override visit with error handling"""
         try:
+            # The super().visit() will correctly traverse the MRO
             return super().visit(tree)
         except OnionRuntimeError as e:
             raise e

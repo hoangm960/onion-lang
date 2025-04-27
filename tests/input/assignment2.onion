@@ -1,0 +1,4 @@
+#Condition assignment
+
+(let a 4) (let b 5)
+(let c (if (> a b) a : b))
