@@ -59,22 +59,19 @@ program:
         block:
          statement:
           statementType:
-           assignment:
-            let:
+           augmentedAssignment:
+            *=:
             result:
             expression:
-             compoundExpr:
-              arithmeticExpr:
-               *:
-               expression:
-                result
-               expression:
-                i
+             i
          statement:
           statementType:
-           incDecStmt:
-            inc:
-            i
+           augmentedAssignment:
+            +=:
+            i:
+            expression:
+             literal:
+              1
      statement:
       statementType:
        returnStmt:

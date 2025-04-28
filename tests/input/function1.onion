@@ -6,8 +6,8 @@
     (let result 1)
     (let i 1)
     (while (<= i n)
-        (let result (* result i))
-        (inc i))
+        (*= result i)
+        (+= i 1))
     (return result))
 
 (print (factorial 5))                        # Function call

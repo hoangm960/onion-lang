@@ -1,149 +1,184 @@
-// --- START OF FILE Onion.g4 ---
-
 grammar Onion;
 
 // Top-level rules
+program: statement+ EOF;
 
-program: statement+ EOF; // Added EOF for completeness
-
-statement: '(' statementType ')';
+statement: 
+    LPAREN statementType RPAREN
+    | LPAREN SIFE statementType RPAREN
+    ;
 
 statementType:
-	assignment
-	| expression
-	| printStatement
-	| macroDef
-	| classDef
-	| loopStatement
-	| incDecStmt
-	| functionDef
-	| returnStmt
-	| block
-	| ifExpr
-	| branchExpr
-	| appendStmt;
-
-incDecStmt:
-	'inc' IDENTIFIER // Increment: (inc x)
-	| 'dec' IDENTIFIER; // Decrement: (dec x)
+    assignment
+    | augmentedAssignment
+    | expression
+    | printStatement
+    | macroDef
+    | classDef
+    | loopStatement
+    | functionDef
+    | returnStmt
+    | block
+    | ifStmt
+    | appendStmt;
 
 assignment:
-	'let' IDENTIFIER (expression | ternaryExpr)
-	| 'let' ( '(' IDENTIFIER (expression | ternaryExpr) ')')+;
+    LET IDENTIFIER (expression | ternaryExpr)
+    | LET (LPAREN IDENTIFIER (expression | ternaryExpr) RPAREN)+;
 
-expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
+augmentedAssignment:
+    PLUS_EQUALS IDENTIFIER (expression | ternaryExpr)
+    | MINUS_EQUALS IDENTIFIER (expression | ternaryExpr)
+    | MULT_EQUALS IDENTIFIER (expression | ternaryExpr)
+    | DIV_EQUALS IDENTIFIER (expression | ternaryExpr)
+    ;
+
+expression: literal | IDENTIFIER | LPAREN compoundExpr RPAREN;
 
 compoundExpr:
-	arithmeticExpr
-	| booleanExpr
-	| logicalExpr
-	| listExpr
-	| callExpr
-	| ifExpr
-	| branchExpr
-	| listOpExpr
-	| ternaryExpr;
-
-// Allow inc/dec to be used in expressions
-incDecExpr:
-	'inc' IDENTIFIER 
-	| 'dec' IDENTIFIER;
+    arithmeticExpr
+    | booleanExpr
+    | logicalExpr
+    | listExpr
+    | callExpr
+    | branchExpr
+    | listOpExpr
+    | ternaryExpr;
 
 arithmeticExpr:
-	'+' expression+
-	| '-' expression expression
-	| '*' expression+
-	| '/' expression expression
-	| '//' expression expression;
+    PLUS expression+
+    | MINUS expression expression
+    | MULT expression+
+    | DIV expression expression
+    | FLOOR_DIV expression expression;
 
 booleanExpr:
-	'==' expression expression
-	| '!=' expression expression
-	| '<' expression expression
-	| '>' expression expression
-	| '<=' expression expression
-	| '>=' expression expression
-	| 'not' expression;
+    EQ expression expression
+    | NEQ expression expression
+    | LT expression expression
+    | GT expression expression
+    | LTE expression expression
+    | GTE expression expression
+    | NOT expression;
 
 logicalExpr:
-	'&' expression expression   // Logical AND
-	| '|' expression expression  // Logical OR
-	| '!' expression;            // Logical NOT
+    AND expression expression
+    | OR expression expression
+    | NOT expression;
 
-listExpr: 'list' expression*; // Allow empty lists (list)
+listExpr: LIST expression*;
 
-ifExpr:
-	'if' expression statement (
-		'(' 'elif' expression statement ')'
-	)* ('(' 'else' statement ')')?;
+ifStmt:
+    IF expression block (
+        LPAREN ELIF expression block RPAREN
+    )* (LPAREN ELSE block RPAREN)?;
 
 branchExpr:
-	'cond' ('(' expression statement ')')+ (
-		'(' 't' statement ')'
-	)?;
+    COND (LPAREN expression statement RPAREN)+ (
+        LPAREN T statement RPAREN
+    )?;
 
 functionDef:
-	'def' IDENTIFIER '(' (IDENTIFIER)* ')' // Simplified parameter list - allows zero params
-	block;
+    DEF IDENTIFIER LPAREN (IDENTIFIER)* RPAREN
+    block;
 
-returnStmt: 'return' expression;
+returnStmt: RETURN expression;
 
 callExpr:
-	IDENTIFIER expression*; // Simplified argument list - allows zero args
+    IDENTIFIER expression*;
 
-printStatement: 'print' expression;
+printStatement: PRINT expression;
 
 loopStatement:
-	'repeat' expression block
-	| 'loop' IDENTIFIER 'range' '(' expression (expression)? (expression)? ')' block
-	| 'while' expression block;
+    REPEAT expression block
+    | LOOP IDENTIFIER RANGE LPAREN expression (expression)? (expression)? RPAREN block
+    | WHILE expression block;
 
 listOpExpr:
-	'head' expression
-	| 'tail' expression
-	| 'getid' expression expression //getid index list
-	| 'sizeof' expression;
+    HEAD expression
+    | TAIL expression
+    | GETID expression expression
+    | SIZEOF expression;
 
-// Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
 macroDef:
-	'macro' IDENTIFIER '(' (IDENTIFIER)* ')' block; // Simplified params
+    MACRO IDENTIFIER LPAREN (IDENTIFIER)* RPAREN block;
 
-classDef: 'class' IDENTIFIER classBody;
+classDef: CLASS IDENTIFIER classBody;
 
-classBody: '(' methodDef+ ')';
+classBody: LPAREN methodDef+ RPAREN;
 
 methodDef:
-	'def' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
+    DEF IDENTIFIER LPAREN IDENTIFIER* RPAREN block;
 
-block: statement+;
+block: 
+    statement+;
 
-appendStmt: 'append' IDENTIFIER expression;
+appendStmt: APPEND IDENTIFIER expression;
 
 literal: INT | FLOAT | BOOL | STRING;
 
 // Keywords as Tokens (matched before IDENTIFIER)
 BOOL: 'true' | 'false';
+LET: 'let';
+IF: 'if';
+ELIF: 'elif';
+ELSE: 'else';
+PRINT: 'print';
+REPEAT: 'repeat';
+LOOP: 'loop';
+RANGE: 'range';
+WHILE: 'while';
+DEF: 'def';
+RETURN: 'return';
+MACRO: 'macro';
+CLASS: 'class';
+COND: 'cond';
+T: 't';
+LIST: 'list';
+HEAD: 'head';
+TAIL: 'tail';
+GETID: 'getid';
+SIZEOF: 'sizeof';
+APPEND: 'append';
 
-// Logical operators as tokens
+// Operators as tokens
+PLUS: '+';
+MINUS: '-';
+MULT: '*';
+DIV: '/';
+FLOOR_DIV: '//';
+EQ: '==';
+NEQ: '!=';
+LT: '<';
+GT: '>';
+LTE: '<=';
+GTE: '>=';
+NOT: 'not';
 AND: '&';
 OR: '|';
-NOT: '!';
+PLUS_EQUALS: '+=';
+MINUS_EQUALS: '-=';
+MULT_EQUALS: '*=';
+DIV_EQUALS: '/=';
 
-// Explicit Colon Token
+// Punctuation tokens
+LPAREN: '(';
+RPAREN: ')';
 COLON: ':';
+SIFE: '$';
 
 // Literals
 INT: '-'? [0-9]+;
 FLOAT: '-'? [0-9]* '.' [0-9]+;
 STRING: '"' (~["\r\n])*? '"';
 
-// Identifier (comes AFTER specific keywords like BOOL)
+// Identifier (comes AFTER specific keywords)
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 
 // Skip whitespace and comments
 WS: [ \t\r\n]+ -> skip;
-COMMENT: '/*' .*? '*/' -> skip; // Non-greedy match
+COMMENT: '/*' .*? '*/' -> skip;
 LINE_COMMENT: '#' ~[\r\n]* -> skip;
 
 ternaryExpr:
-	'if' expression expression COLON expression;
+    IF expression expression COLON expression;

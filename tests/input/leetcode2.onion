@@ -23,11 +23,11 @@
     (def backtrack(start target)
         (if (== target 0)
             ; Found a combination, append a COPY of current to result
-            (append result (copy current)) ; Assumes a 'copy' function exists
+            (append result current) ; Assumes a 'copy' function exists
             ; No return needed here, just proceed after adding the combination
             ((else
                 (if (> target 0)
-                    (loop i start (sizeof candidates)
+                    (loop i range((sizeof candidates))
                         (append current (getid i candidates))
                         (backtrack i (- target (getid i candidates)))
                         (let current (tail current))

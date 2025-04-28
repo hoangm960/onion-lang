@@ -1,5 +1,7 @@
 from antlr4 import CommonTokenStream, InputStream
-from generated import OnionLexer, OnionParser
+from generated.OnionLexer import OnionLexer
+from generated.OnionParser import OnionParser
+
 
 
 class Parser():
