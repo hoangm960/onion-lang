@@ -1,62 +1,52 @@
-name: ci-python-unittest
+name: ANTLR4 + Python CI
 
 on:
   push:
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.13]
+
+    env:
+      ANTLR_VERSION: 4.13.2
+      GRAMMAR_DIR: grammar
+      GEN_DIR: generated
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up Java 11
-      uses: actions/setup-java@v3
-      with:
-        distribution: temurin
-        java-version: '11'
-    - name: Download ANTLR 4.13.2
-      run: |
-        mkdir -p tools
-        curl -sSL https://www.antlr.org/download/antlr-4.13.2-complete.jar \
-          -o tools/antlr-4.13.2-complete.jar
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-        # Create a one-line wrapper so you can just run "antlr4"
-        cat << 'EOF' > tools/antlr4
-        #!/usr/bin/env bash
-        java -jar "$PWD/tools/antlr-4.13.2-complete.jar" "$@"
-        EOF
-        chmod +x tools/antlr4
+      - name: Set up JDK (for ANTLR)
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '17'
 
-        # Add our tools folder to the PATH
-        echo "$PWD/tools" >> $GITHUB_PATH
-    - name: Generate ANTLR sources
-      run: |
-        mkdir -p generated
-        antlr4 \
-          -Dlanguage=Python3 \
-          -visitor \
-          -o generated \
-          grammar/Onion.g4
+      - name: Download ANTLR tool
+        run: |
+          curl -sSL https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -o antlr.jar
+          echo "ANTLR tool downloaded (version ${{ env.ANTLR_VERSION }})"
 
-        ls generated
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install antlr4-python3-runtime boto3
-        if [ -f requirements.txt ]; then
-          pip install -r requirements.txt
-        fi
-    - name: Test with unittest
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-      run: |
-        python test.py
+      - name: Generate Python parser from grammar
+        run: |
+          mkdir -p ${{ env.GEN_DIR }}
+          java -jar antlr.jar \
+            -Dlanguage=Python3 \
+            -o ${{ env.GEN_DIR }} \
+            ${{ env.GRAMMAR_DIR }}/*.g4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install antlr4-python3-runtime
+
+      - name: Run tests
+        run: python test.py
