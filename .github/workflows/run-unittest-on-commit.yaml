@@ -35,6 +35,7 @@ jobs:
           mkdir -p ${{ env.GEN_DIR }}
           java -jar antlr.jar \
             -Dlanguage=Python3 \
+            -visitor\
             -o ${{ env.GEN_DIR }} \
             ${{ env.GRAMMAR_DIR }}/*.g4
             
