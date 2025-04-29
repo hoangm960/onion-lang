@@ -37,7 +37,12 @@ jobs:
             -Dlanguage=Python3 \
             -o ${{ env.GEN_DIR }} \
             ${{ env.GRAMMAR_DIR }}/*.g4
-          ls ${{ env.GEN_DIR }}/grammar
+      - name: Flatten generated directory
+        run: |
+          if [ -d "${{ env.GEN_DIR }}/grammar" ]; then
+            mv ${{ env.GEN_DIR }}/grammar/* ${{ env.GEN_DIR }}/
+            rmdir ${{ env.GEN_DIR }}/grammar
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v4
