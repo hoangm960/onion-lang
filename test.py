@@ -1,9 +1,10 @@
+import os
+import sys
+import unittest
 from io import StringIO
+
 from src.interpreter import Interpreter
 from src.parser import Parser
-import unittest
-import sys
-import os
 
 TEST_DIR = "./tests/semantics"
 
@@ -79,4 +80,5 @@ def get_suite():
 
 
 if __name__ == "__main__":
-    unittest.TextTestRunner().run(get_suite())
+    result = unittest.TextTestRunner().run(get_suite())
+    sys.exit(0 if result.wasSuccessful() else 1)
