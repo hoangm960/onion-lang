@@ -43,8 +43,7 @@ jobs:
           -o generated \
           grammar/Onion.g4
 
-        # Make generated/ a proper Python package
-        touch generated/__init__.py
+        ls generated
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
