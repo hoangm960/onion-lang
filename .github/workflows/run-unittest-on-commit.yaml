@@ -12,25 +12,52 @@ jobs:
         python-version: [3.13]
 
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Java 11
+      uses: actions/setup-java@v3
+      with:
+        distribution: temurin
+        java-version: '11'
+    - name: Download ANTLR 4.13.2
+      run: |
+        mkdir -p tools
+        curl -sSL https://www.antlr.org/download/antlr-4.13.2-complete.jar \
+          -o tools/antlr-4.13.2-complete.jar
 
-      - name: Setup Antlr4
-        uses: siacodelabs/setup-antlr4@v2
+        # Create a one-line wrapper so you can just run "antlr4"
+        cat << 'EOF' > tools/antlr4
+        #!/usr/bin/env bash
+        java -jar "$PWD/tools/antlr-4.13.2-complete.jar" "$@"
+        EOF
+        chmod +x tools/antlr4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+        # Add our tools folder to the PATH
+        echo "$PWD/tools" >> $GITHUB_PATH
+    - name: Generate ANTLR sources
+      run: |
+        mkdir -p generated
+        antlr4 \
+          -Dlanguage=Python3 \
+          -visitor \
+          -o generated \
+          grammar/Onion.g4
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install antlr4-python3-runtime boto3
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Run Antlr4
-        run: antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
-          
-      - name: Test with unittest
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: python test.py
+        # Make generated/ a proper Python package
+        touch generated/__init__.py
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install antlr4-python3-runtime boto3
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+    - name: Test with unittest
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python test.py
