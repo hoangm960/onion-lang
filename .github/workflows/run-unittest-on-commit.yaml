@@ -37,7 +37,7 @@ jobs:
             -Dlanguage=Python3 \
             -o ${{ env.GEN_DIR }} \
             ${{ env.GRAMMAR_DIR }}/*.g4
-          ls env.GEN_DIR
+          ls ${{ env.GEN_DIR }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
