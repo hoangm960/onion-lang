@@ -1,0 +1,11 @@
+(print (== 5 5))
+(print (!= 5 3))
+(print (< 2 3))
+(print (>= 7 7))
+(print (not false))
+
+True
+True
+True
+True
+True

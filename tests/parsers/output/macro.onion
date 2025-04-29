@@ -1,0 +1,4 @@
+# Syntax Tree for macro.onion
+(program (statement ( (statementType (macroDef macro double ( x ) (block (statement ( (statementType (printStatement print (expression ( (compoundExpr (arithmeticExpr * (expression x) (expression (literal 2)))) )))) ))))) )) (statement ( (statementType (expression ( (compoundExpr (callExpr double (expression (literal 7)))) ))) )) 14 <EOF>)
+
+# Execution Results

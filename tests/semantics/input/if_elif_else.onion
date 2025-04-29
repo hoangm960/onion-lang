@@ -1,0 +1,7 @@
+(if (== 1 2)
+    (print "A")
+    (elif (> 2 1) (print "B"))
+    (else (print "C"))
+)
+
+B

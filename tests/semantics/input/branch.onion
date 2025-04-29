@@ -1,0 +1,13 @@
+(cond
+    ((< 1 0)
+     (print "branch1")
+    )
+    ((> 2 3)
+     (print "branch2")
+    )
+    (t
+     (print "default")
+    )
+)
+
+default
