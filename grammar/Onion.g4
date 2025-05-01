@@ -34,15 +34,16 @@ assignment:
 expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
 
 compoundExpr:
-	arithmeticExpr
-	| booleanExpr
-	| logicalExpr
-	| listExpr
-	| callExpr
-	| ifExpr
-	| branchExpr
-	| listOpExpr
-	| ternaryExpr;
+    arithmeticExpr # Arithmetic
+  | booleanExpr # Boolean
+  | logicalExpr # Logical
+  | listExpr # List
+  | callExpr # Call
+  | ifExpr # If
+  | branchExpr # Branch
+  | ternaryExpr # Ternary
+  | listOpExpr # ListOp
+;
 
 // Allow inc/dec to be used in expressions
 incDecExpr:

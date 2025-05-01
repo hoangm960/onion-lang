@@ -1,17 +1,14 @@
-from generated.OnionVisitor import OnionVisitor
-from generated.OnionParser import OnionParser
-import sys
 import os
-from src.symbol_table import SymbolTable
-from src.exceptions import (
-    OnionRuntimeError,
-    OnionNameError,
-    OnionArgumentError,
-    OnionTypeError,
-    OnionPrintError
-)
+import sys
+
+from antlr4 import ErrorNode, TerminalNode
+
+from generated.OnionParser import OnionParser
+from generated.OnionVisitor import OnionVisitor
 from src.builtins import BuiltInFunctions
-from antlr4 import TerminalNode, ErrorNode
+from src.exceptions import (OnionArgumentError, OnionNameError,
+                            OnionPrintError, OnionRuntimeError, OnionTypeError)
+from src.symbol_table import SymbolTable
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
