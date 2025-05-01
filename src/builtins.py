@@ -1,4 +1,9 @@
-from src.exceptions import OnionArgumentError, OnionNameError, OnionTypeError
+from src.exceptions import (
+    OnionArgumentError,
+    OnionNameError,
+    OnionRuntimeError,
+    OnionTypeError,
+)
 
 
 class BuiltInFunctions:
@@ -11,6 +16,7 @@ class BuiltInFunctions:
         cls.register("len", cls._len)
         cls.register("typeof", cls._typeof)
         cls.register("copy", cls._copy)
+        cls.register("fact", cls._fact)
 
     @classmethod
     def register(cls, name, func):
@@ -50,7 +56,6 @@ class BuiltInFunctions:
             return "list"
         return type(value).__name__
 
-
     @staticmethod
     def _copy(interpreter, args):
         """Built-in copy function for lists."""
@@ -60,4 +65,22 @@ class BuiltInFunctions:
         if isinstance(value, list):
             return value[:]  # Return a shallow copy
         # Can optionally add support for copying other types if needed
-        raise OnionTypeError(f"copy() currently only supports lists, got {type(value).__name__}")
+        raise OnionTypeError(
+            f"copy() currently only supports lists, got {type(value).__name__}"
+        )
+
+    @staticmethod
+    def _fact(interpreter, args):
+        if len(args) != 1:
+            raise OnionArgumentError(f"fact() expects 1 argument, got {len(args)}")
+        n = args[0]
+        if not isinstance(n, int):
+            raise OnionTypeError(f"fact() requires an integer, got {type(n).__name__}")
+        if n < 0:
+            raise OnionRuntimeError(
+                "fact() cannot compute factorial of a negative number"
+            )
+        result = 1
+        for i in range(1, n + 1):
+            result *= i
+        return result
