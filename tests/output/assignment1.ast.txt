@@ -1,0 +1,30 @@
+# AST for assignment1.onion
+
+program:
+ statement:
+  statementType:
+   assignment:
+    let:
+    x:
+    expression:
+     literal:
+      10
+ statement:
+  statementType:
+   assignment:
+    let:
+    myList:
+    expression:
+     compoundExpr:
+      listExpr:
+       list:
+       expression:
+        literal:
+         1
+       expression:
+        literal:
+         2
+       expression:
+        literal:
+         3
+ <EOF>

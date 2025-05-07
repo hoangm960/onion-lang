@@ -1,0 +1,14 @@
+(let name "World")
+(print (+ "Hello, " name "!"))
+(print (+ 5 10))
+(print (+ "Hello, " 5))
+(print (+ true false))
+(print (+ true 1))
+(print (+ 2 2.15))
+
+Hello, World!
+15
+Print error: Cannot add values of type <class 'str'> and <class 'int'>
+1
+2
+4.15
