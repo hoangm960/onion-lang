@@ -56,6 +56,7 @@ class SemanticTest(FileTestCase):
         self.interpreter = Interpreter()
 
     def runTest(self):
+        print("Testing file: ", self.file_path)
         test_data = None
         with open(self.file_path) as fin:
             test_data = fin.read()
