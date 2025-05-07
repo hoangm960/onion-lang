@@ -28,8 +28,8 @@
         
         # Move pointers - we move the pointer with smaller height
         (if (< left_height right_height)
-            (inc left)
-            (else (dec right))
+            (+= left 1)
+            (else (-= right 1))
         )
     )
     

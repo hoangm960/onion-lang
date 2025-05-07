@@ -1,0 +1,43 @@
+(def binary_search(arr target) (
+    (let left 0)
+    (let right (- (sizeof arr) 1))
+    (while (<= left right)
+        (let mid (// (+ left right) 2))
+        (let mid_val (getid mid arr))
+        (if (== mid_val target)
+            (return mid)
+            (elif (> mid_val target)
+                (let right (- mid 1))
+            )
+            (else
+                (let left (+ mid 1))
+            )
+        )
+    )
+    (return -1)
+))
+(let a (list -2 0 1 2 3 4 5 6 7 8 9 10))
+(print (binary_search a 1234))
+(print (binary_search a 123))
+(print (binary_search a -3))
+(print (binary_search a 44))
+(loop i range (0 (sizeof a) 1)
+    (print (binary_search a (getid i a)))
+)
+
+-1
+-1
+-1
+-1
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11

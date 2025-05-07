@@ -1,0 +1,59 @@
+name: ANTLR4 + Python CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      ANTLR_VERSION: 4.13.2
+      GRAMMAR_DIR: grammar
+      GEN_DIR: generated
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK (for ANTLR)
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download ANTLR tool
+        run: |
+          curl -sSL https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -o antlr.jar
+          echo "ANTLR tool downloaded (version ${{ env.ANTLR_VERSION }})"
+
+      - name: Generate Python parser from grammar
+        run: |
+          mkdir -p ${{ env.GEN_DIR }}
+          java -jar antlr.jar \
+            -Dlanguage=Python3 \
+            -visitor\
+            -o ${{ env.GEN_DIR }} \
+            ${{ env.GRAMMAR_DIR }}/*.g4
+            
+      - name: Flatten generated directory
+        run: |
+          if [ -d "${{ env.GEN_DIR }}/grammar" ]; then
+            mv ${{ env.GEN_DIR }}/grammar/* ${{ env.GEN_DIR }}/
+            rmdir ${{ env.GEN_DIR }}/grammar
+          fi
+          ls ${{ env.GEN_DIR }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install antlr4-python3-runtime
+
+      - name: Run tests
+        run: python test.py

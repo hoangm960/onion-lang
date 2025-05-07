@@ -1,0 +1,10 @@
+(let lst (list 1 2 3 4))
+(print (head lst))
+(print (tail lst))
+(print (getid 2 lst))
+(print (sizeof lst))
+
+1
+[2, 3, 4]
+3
+4

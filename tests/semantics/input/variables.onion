@@ -1,0 +1,8 @@
+(let x 10)
+(inc x)
+(print x)
+(dec x)
+(print x)
+
+11
+10
