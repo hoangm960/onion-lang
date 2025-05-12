@@ -1,7 +1,7 @@
 import os
 import sys
 
-from antlr4 import ErrorNode, TerminalNode
+from antlr4 import TerminalNode
 
 from generated.OnionParser import OnionParser
 from generated.OnionVisitor import OnionVisitor
@@ -103,7 +103,7 @@ class BaseInterpreter(OnionVisitor):
                              raise OnionRuntimeError(f"Malformed multi-assignment pair starting near index {i}")
                     else:
                         raise OnionRuntimeError(f"Incomplete multi-assignment pair starting near index {i}")
-                
+
                 i += 1 # Move to the next child, checking if it starts a pair
             return result # Return the value of the last assignment in the multi-let
 
@@ -182,7 +182,7 @@ class BaseInterpreter(OnionVisitor):
             self.env = environment
         else:
             self.env.push_scope()
-            
+
         try:
             result = None
             for statement in statements:
@@ -209,7 +209,7 @@ class BaseInterpreter(OnionVisitor):
                 result = None
 
         return result
-    
+
     def visitAppendStmt(self, ctx):
         """Visit the append statement: (append list_var element_expr)"""
         var_name = ctx.IDENTIFIER().getText()
@@ -253,7 +253,7 @@ class ExpressionVisitor(BaseInterpreter):
         if value is None:
             raise NameError(f"Variable '{name}' is not defined")
         return value
-        
+
     def _assign_variable(self, name, value):
         """Assign a value to a variable in the environment"""
         # Search for the variable in existing scopes
@@ -263,7 +263,7 @@ class ExpressionVisitor(BaseInterpreter):
                 scope[name] = value
                 found = True
                 break
-                
+
         return found
 
     def visitExpression(self, ctx):
@@ -426,7 +426,7 @@ class BooleanVisitor(ExpressionVisitor):
             "not": self._handle_not,
         }
         return handlers[op](ctx)
-    
+
     def visitLogicalExpr(self, ctx):
         op = ctx.getChild(0).getText()
         handlers = {
@@ -444,7 +444,7 @@ class BooleanVisitor(ExpressionVisitor):
             return False
         right = self.visit(ctx.expression(1))
         return bool(left and right)
-        
+
     def _handle_or(self, ctx):
         # Logical OR: (| expr1 expr2)
         left = self.visit(ctx.expression(0))
@@ -453,7 +453,7 @@ class BooleanVisitor(ExpressionVisitor):
             return True
         right = self.visit(ctx.expression(1))
         return bool(left or right)
-        
+
     def _handle_not_logical(self, ctx):
         # Logical NOT: (! expr) - equivalent to (not expr) but keeping both for compatibility
         value = self.visit(ctx.expression(0))
@@ -755,24 +755,24 @@ class FunctionVisitor(BaseInterpreter):
 
     def visitCallExpr(self, ctx):
         name = ctx.IDENTIFIER().getText()
-        
+
         # Evaluate all arguments
         args = self._evaluate_arguments(ctx)
         if name in self.macros:
             return self._handle_macro_call(ctx, name, args)
-            
+
         if name in BuiltInFunctions.registry:
             return BuiltInFunctions.execute(name, self, args)
-        
+
         elif name == "typeof":
             return self._handle_typeof(args)
-            
+
         if name in self.functions:
             return self._handle_function_call(ctx, name, args)
-            
+
         # Function not found
         raise OnionNameError(f"Function '{name}' is not defined")
-            
+
     def _handle_typeof(self, args):
         """Handle the built-in typeof function"""
         if len(args) != 1:
@@ -790,7 +790,7 @@ class FunctionVisitor(BaseInterpreter):
             return "list"
         else:
             return "unknown"
-    
+
     def _handle_function_call(self, ctx, name, args=None):
         function_def = self.functions[name]
         params = function_def["params"]
@@ -805,7 +805,7 @@ class FunctionVisitor(BaseInterpreter):
             )
 
         self.env.push_scope()
-        
+
         current_scope = self.env.current_scope()
         # Define parameters directly in the new scope
         for i, param in enumerate(params):
@@ -816,7 +816,7 @@ class FunctionVisitor(BaseInterpreter):
         for i in range(body.getChildCount()):
             stmt = body.getChild(i)
             stmt_result = self.visit(stmt) # This might return a ReturnValue object
-            
+
             if isinstance(stmt_result, ReturnValue):
                 final_return_value = stmt_result.value # Extract the actual value
                 break # Exit the loop immediately upon return
@@ -833,7 +833,7 @@ class FunctionVisitor(BaseInterpreter):
         """Handle execution of a macro"""
         if macro_name is None:
             macro_name = ctx.IDENTIFIER().getText()
-            
+
         macro_def = self.macros[macro_name]
         params = macro_def["params"]
         body = macro_def["body"]
@@ -850,7 +850,7 @@ class FunctionVisitor(BaseInterpreter):
 
         # Create a new scope for macro execution
         self.env.push_scope()
-        
+
         try:
             # Define parameters in the new scope
             for i, param in enumerate(params):
@@ -861,18 +861,18 @@ class FunctionVisitor(BaseInterpreter):
             for i in range(body.getChildCount()):
                 stmt = body.getChild(i)
                 stmt_result = self.visit(stmt)
-                
+
                 if isinstance(stmt_result, ReturnValue):
                     result = stmt_result.value
                     break
                 elif stmt_result is not None:
                     result = stmt_result
-                    
+
             return result
         finally:
             # Restore previous scope
             self.env.pop_scope()
-            
+
     def _evaluate_arguments(self, ctx):
         """Evaluate function call arguments"""
         args = []
@@ -909,5 +909,3 @@ class Interpreter(
             raise e
         except Exception as e:
             raise OnionRuntimeError(f"Runtime error: {str(e)}") from e
-
-
