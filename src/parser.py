@@ -24,6 +24,8 @@ class Parser():
 
             self.tree = self.parser.program()
             return self.tree
+        except SyntaxError as e:
+            print(e)
         except Exception as e:
             print(f"Parse error: {e}")
 
