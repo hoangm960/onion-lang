@@ -1,0 +1,15 @@
+# This example demonstrates mutual recursion error
+# Two functions calling each other infinitely
+
+(def ping (n)
+    (print (+ "Ping: " n))
+    (pong (+ n 1))  # Call pong with incremented value
+)
+
+(def pong (n)
+    (print (+ "Pong: " n))
+    (ping (+ n 1))  # Call ping with incremented value
+)
+
+# Start the ping-pong recursion with value 1
+(ping 1) 

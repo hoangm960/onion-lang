@@ -1,16 +1,21 @@
 import os
 import sys
+import time
+import re
 
 from antlr4 import TerminalNode
 
 from generated.OnionParser import OnionParser
 from generated.OnionVisitor import OnionVisitor
 from src.builtins import BuiltInFunctions
-from src.exceptions import (OnionArgumentError, OnionNameError,
-                            OnionPrintError, OnionRuntimeError, OnionTypeError)
+from src.exceptions import (OnionArgumentError, OnionAssignmentError, OnionDivisionByZeroError,
+                           OnionEmptyListError, OnionIndexError, OnionInterpolationError, 
+                           OnionLoopRangeError, OnionNameError, OnionOperationError, 
+                           OnionPrintError, OnionRecursionError, OnionRuntimeError, 
+                           OnionTimeoutError, OnionTypeError)
 from src.symbol_table import SymbolTable
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class ReturnValue:
@@ -26,10 +31,26 @@ class BaseInterpreter(OnionVisitor):
         self.env = SymbolTable()
         self.functions = {}  # Lưu trữ các định nghĩa hàm
         self.macros = {}  # Lưu trữ các định nghĩa hàm
+        self.start_time = time.time()  # Time when execution started
+        self.max_execution_time = 300.0  # Default timeout: 5 minutes
+        self.last_timeout_check = time.time()  # Track when we last checked timeout
+
+    def check_timeout(self):
+        """Check if execution has exceeded maximum time"""
+        # Only check every 0.1 seconds to avoid excessive time.time() calls
+        current_time = time.time()
+        if current_time - self.last_timeout_check < 0.1:
+            return  # Skip checking if less than 0.1 seconds passed since last check
+            
+        self.last_timeout_check = current_time
+        if current_time - self.start_time > self.max_execution_time:
+            raise OnionTimeoutError(f"Execution exceeded maximum time limit of {self.max_execution_time} seconds")
 
     def visitProgram(self, ctx):
+        self.start_time = time.time()  # Reset timer at start of program
         result = None
         for stmt in ctx.statement():
+            self.check_timeout()  # Check timeout before each statement
             result = self.visit(stmt)
             if isinstance(result, ReturnValue):
                 break
@@ -66,8 +87,12 @@ class BaseInterpreter(OnionVisitor):
             value = self.visit(ctx.expression())
             print(value)
             return None
+        except OnionRuntimeError as e:
+            # Pass through Onion errors directly rather than wrapping them
+            raise e
         except Exception as e:
-            raise OnionPrintError from e
+            # Only wrap unexpected non-Onion errors
+            raise OnionPrintError(f"Error in print statement: {str(e)}")
 
     def visitAssignment(self, ctx):
         # Check the second child to distinguish assignment types
@@ -90,7 +115,7 @@ class BaseInterpreter(OnionVisitor):
                         closing_paren = ctx.getChild(i+3)
 
                         # Basic structural check for '(' IDENTIFIER (expression | ternaryExpr) ')'
-                        if isinstance(var_name_node, TerminalNode) and ctx.parser.ruleNames[var_name_node.symbol.type -1] == 'IDENTIFIER' and \
+                        if isinstance(var_name_node, TerminalNode) and var_name_node.symbol.type == OnionParser.IDENTIFIER and \
                            (isinstance(expr_node, OnionParser.ExpressionContext) or isinstance(expr_node, OnionParser.TernaryExprContext)) and \
                            isinstance(closing_paren, TerminalNode) and closing_paren.getText() == ')':
 
@@ -100,10 +125,10 @@ class BaseInterpreter(OnionVisitor):
                             result = var_value # Keep track of the last assigned value
                             i += 3 # Move index past the processed pair ')'
                         else:
-                             raise OnionRuntimeError(f"Malformed multi-assignment pair starting near index {i}")
+                             raise OnionAssignmentError(f"Malformed multi-assignment pair starting near index {i}")
                     else:
-                        raise OnionRuntimeError(f"Incomplete multi-assignment pair starting near index {i}")
-
+                        raise OnionAssignmentError(f"Incomplete multi-assignment pair starting near index {i}")
+                
                 i += 1 # Move to the next child, checking if it starts a pair
             return result # Return the value of the last assignment in the multi-let
 
@@ -119,11 +144,11 @@ class BaseInterpreter(OnionVisitor):
                  return value
              else:
                  # Should not happen based on the grammar if single/conditional
-                 raise OnionRuntimeError(f"Unexpected number of expressions ({len(expressions)}) in single/conditional assignment for '{identifier}'")
+                 raise OnionAssignmentError(f"Unexpected number of expressions ({len(expressions)}) in single/conditional assignment for '{identifier}'")
         else:
             # This case should theoretically not be reachable if the grammar is correct
             # and the input parses successfully.
-            raise OnionRuntimeError("Unrecognized assignment structure")
+            raise OnionAssignmentError("Unrecognized assignment structure")
 
     def visitBlock(self, ctx):
         """Xử lý block các câu lệnh"""
@@ -306,11 +331,57 @@ class ExpressionVisitor(BaseInterpreter):
             return float(ctx.FLOAT().getText())
         if ctx.STRING():
             text = ctx.STRING().getText()
+            # Regular string - just remove the quotes
             return text[1:-1]
+        if ctx.FSTRING():
+            text = ctx.FSTRING().getText()
+            # Remove the 'f"' prefix and the ending quote
+            text = text[2:-1]
+            try:
+                return self._interpolate_string(text)
+            except Exception as e:
+                raise OnionInterpolationError(f"String interpolation failed: {str(e)}")
         if ctx.BOOL():
             token = ctx.BOOL().getText()
             return token == "true"
         return None
+
+    def _interpolate_string(self, text):
+        """
+        Interpolate variables in a string using (var) syntax.
+        Similar to Python's f-strings but with parentheses instead of curly braces.
+        """
+        def replace_var(match):
+            expr = match.group(1).strip()
+            
+            # Check for special cases like len
+            if expr.startswith('len '):
+                # Handle len function
+                var_name = expr[4:].strip()  # Get the argument after 'len'
+                value = self.env.lookup(var_name)
+                if value is None:
+                    raise OnionNameError(f"Variable '{var_name}' not found in string interpolation")
+                if not isinstance(value, (list, str)):
+                    raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
+                return str(len(value))
+            
+            # Handle nested expressions by checking if it contains spaces
+            if ' ' in expr:
+                # It's likely an expression, not just a variable name
+                raise OnionInterpolationError(f"Complex expressions in string interpolation not supported: '{expr}'")
+                
+            # Look up the variable in the environment
+            value = self.env.lookup(expr)
+            if value is None:
+                raise OnionNameError(f"Variable '{expr}' not found in string interpolation")
+                
+            # Convert the value to string
+            return str(value)
+            
+        # Use regex to find and replace all (var) patterns
+        pattern = r'\(([^)]+)\)'
+        result = re.sub(pattern, replace_var, text)
+        return result
 
     def visitIncDecExpr(self, ctx):
         """Handle increment/decrement expressions"""
@@ -363,8 +434,8 @@ class ArithmeticVisitor(ExpressionVisitor):
             elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
                 result = result + value
             else:
-                raise TypeError(
-                    f"Cannot add values of type {type(result)} and {type(value)}"
+                raise OnionOperationError(
+                    f"Cannot add values of type {type(result).__name__} and {type(value).__name__}"
                 )
         return result
 
@@ -398,7 +469,7 @@ class ArithmeticVisitor(ExpressionVisitor):
         if left is None or right is None:
             raise ValueError("Cannot evaluate division operands")
         if right == 0:
-            raise ZeroDivisionError("Division by zero")
+            raise OnionDivisionByZeroError("Division by zero")
         return left / right
 
     def _handle_integer_division(self, ctx):
@@ -409,7 +480,7 @@ class ArithmeticVisitor(ExpressionVisitor):
         if left is None or right is None:
             raise ValueError("Cannot evaluate integer division operands")
         if right == 0:
-            raise ZeroDivisionError("Division by zero")
+            raise OnionDivisionByZeroError("Integer division by zero")
         return left // right
 
 
@@ -522,62 +593,70 @@ class ListVisitor(BaseInterpreter):
         handlers = {
             "head": self._handle_head,
             "tail": self._handle_tail,
-            "getid": self._handle_getid,
-            "sizeof": self._handle_sizeof,
+            "id": self._handle_getid,
+            "len": self._handle_sizeof,
         }
         if op not in handlers:
             raise OnionNameError(f"Unknown list operation '{op}'")
         return handlers[op](ctx)
 
     def _handle_head(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        self._validate_non_empty(lst, "head")
-        return lst[0]
+        value = self._resolve_list_or_string(ctx, 0)
+        self._validate_non_empty(value, "head")
+        return value[0]
 
     def _handle_tail(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        self._validate_non_empty(lst, "tail")
-        return lst[1:]
+        value = self._resolve_list_or_string(ctx, 0)
+        self._validate_non_empty(value, "tail")
+        return value[1:]
 
     def _handle_getid(self, ctx):
         if len(ctx.expression()) < 2:
-            raise OnionArgumentError("getid requires an index and a list")
+            raise OnionArgumentError("Requires an index and a list or string")
         index = self.visit(ctx.expression(0))
         if not isinstance(index, int):
             raise OnionTypeError(
                 f"Index must be an integer, got {type(index).__name__}"
             )
-        lst = self.visit(ctx.expression(1))
-        if not isinstance(lst, list):
-            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
-        if index < 0 or index >= len(lst):
-            raise OnionRuntimeError(
-                f"Index {index} out of range for list of length {len(lst)}"
-            )
-        return lst[index]
+        value = self.visit(ctx.expression(1))
+        if not isinstance(value, (list, str)):
+            raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
+        if index < 0 or index >= len(value):
+            # Format a clear error message for out of bounds
+            if len(value) == 0:
+                raise OnionIndexError(f"Cannot access index {index} in an empty {type(value).__name__}")
+            elif index < 0:
+                raise OnionIndexError(f"Negative index {index} not allowed. Valid indices are 0 to {len(value)-1}")
+            else:
+                raise OnionIndexError(f"Index {index} out of range. Valid indices are 0 to {len(value)-1}")
+        return value[index]
 
     def _handle_sizeof(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        return len(lst)
-
-    def _resolve_list(self, ctx, expr_index):
+        value = self._resolve_list_or_string(ctx, 0)
+        return len(value)
+        
+    def _resolve_list_or_string(self, ctx, expr_index):
         # Prefer explicit expression argument
         if len(ctx.expression()) > expr_index:
-            lst = self.visit(ctx.expression(expr_index))
+            value = self.visit(ctx.expression(expr_index))
         else:
             # Fallback: next token after op is an identifier
             var_name = ctx.getChild(expr_index + 1).getText()
             try:
-                lst = self.env.resolve(var_name)
+                value = self.env.resolve(var_name)
             except NameError:
                 raise OnionNameError(f"Variable '{var_name}' is not defined")
-        if not isinstance(lst, list):
-            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
-        return lst
+                
+        # Check if it's a list or string
+        if not isinstance(value, (list, str)):
+            raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
+            
+        return value
 
-    def _validate_non_empty(self, lst, op):
-        if not lst:
-            raise OnionRuntimeError(f"Cannot perform '{op}' on empty list")
+    def _validate_non_empty(self, value, op):
+        if not value:
+            value_type = "list" if isinstance(value, list) else "string"
+            raise OnionEmptyListError(f"Cannot perform '{op}' on empty {value_type}")
 
 
 class ConditionalVisitor(BaseInterpreter):
@@ -681,14 +760,29 @@ class LoopVisitor(BaseInterpreter):
         for val, name in ((start, "start"), (end, "end"), (step, "step")):
             if not isinstance(val, int):
                 raise OnionTypeError(f"Loop {name} must be an integer")
+        
         if step == 0:
-            raise OnionRuntimeError("Step cannot be zero")
+            raise OnionLoopRangeError("Loop step cannot be zero")
+            
+        # Check for invalid range parameters
+        if (step > 0 and start > end) or (step < 0 and start < end):
+            raise OnionLoopRangeError(f"Loop will never execute with range({start}, {end}, {step})")
 
         block_node = ctx.getChild(ctx.getChildCount() - 1)
         seq = range(start, end, step)
 
         def body():
+            # Safety check for very large ranges
+            if len(seq) > 100000:
+                raise OnionLoopRangeError(f"Range too large: {len(seq)} iterations")
+                
+            iteration_count = 0
             for current in seq:
+                # Check timeout periodically
+                iteration_count += 1
+                if iteration_count % 1000 == 0:
+                    self.check_timeout()
+                    
                 self.env.define(var_name, current)
                 yield self.visit(block_node)
 
@@ -699,7 +793,15 @@ class LoopVisitor(BaseInterpreter):
         block_node = ctx.getChild(2) if ctx.getChildCount() > 2 else None
 
         def body():
+            iterations = 0
             while True:
+                self.check_timeout()  # Check timeout on each iteration
+                
+                # Add a safeguard for very tight loops
+                iterations += 1
+                if iterations % 1000 == 0:  # Check every 1000 iterations
+                    self.check_timeout()
+                    
                 cond = self.visit(cond_ctx)
                 if not isinstance(cond, bool):
                     raise OnionTypeError("While condition must be boolean")
@@ -727,6 +829,11 @@ class LoopVisitor(BaseInterpreter):
 
 
 class FunctionVisitor(BaseInterpreter):
+    def __init__(self):
+        super().__init__()
+        self.call_stack = []
+        self.max_recursion_depth = 1000  # Set a reasonable default max recursion depth
+    
     def visitFunctionDef(self, ctx):
         identifiers = ctx.IDENTIFIER()
         if not identifiers:
@@ -792,42 +899,60 @@ class FunctionVisitor(BaseInterpreter):
             return "unknown"
 
     def _handle_function_call(self, ctx, name, args=None):
-        function_def = self.functions[name]
-        params = function_def["params"]
-        body = function_def["body"]
+        # Check timeout before function execution
+        self.check_timeout()
+        
+        # Check recursion depth
+        if name in self.call_stack:
+            # Count how many times this function appears in the call stack
+            recursion_depth = sum(1 for func in self.call_stack if func == name)
+            if recursion_depth >= self.max_recursion_depth:
+                raise OnionRecursionError(f"Maximum recursion depth ({self.max_recursion_depth}) exceeded for function '{name}'")
+        
+        # Add function to call stack
+        self.call_stack.append(name)
+        
+        try:
+            function_def = self.functions[name]
+            params = function_def["params"]
+            body = function_def["body"]
 
-        if args is None:
-            args = self._evaluate_arguments(ctx)
+            if args is None:
+                args = self._evaluate_arguments(ctx)
 
-        if len(args) != len(params):
-            raise OnionArgumentError(
-                f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
-            )
+            if len(args) != len(params):
+                raise OnionArgumentError(
+                    f"Function '{name}' expected {len(params)} arguments, got {len(args)}"
+                )
 
-        self.env.push_scope()
+            self.env.push_scope()
+            
+            current_scope = self.env.current_scope()
+            # Define parameters directly in the new scope
+            for i, param in enumerate(params):
+                current_scope[param] = args[i]
 
-        current_scope = self.env.current_scope()
-        # Define parameters directly in the new scope
-        for i, param in enumerate(params):
-            current_scope[param] = args[i]
+            final_return_value = None
+            # Execute the function body statement by statement
+            for i in range(body.getChildCount()):
+                self.check_timeout()  # Check timeout during function execution
+                stmt = body.getChild(i)
+                stmt_result = self.visit(stmt) # This might return a ReturnValue object
+                
+                if isinstance(stmt_result, ReturnValue):
+                    final_return_value = stmt_result.value # Extract the actual value
+                    break # Exit the loop immediately upon return
+                elif stmt_result is not None:
+                    # If no explicit return, the value of the last statement is used (like Lisp)
+                    final_return_value = stmt_result
 
-        final_return_value = None
-        # Execute the function body statement by statement
-        for i in range(body.getChildCount()):
-            stmt = body.getChild(i)
-            stmt_result = self.visit(stmt) # This might return a ReturnValue object
+            # The scope is still present here, after body execution / return detection
+            self.env.pop_scope()
 
-            if isinstance(stmt_result, ReturnValue):
-                final_return_value = stmt_result.value # Extract the actual value
-                break # Exit the loop immediately upon return
-            elif stmt_result is not None:
-                # If no explicit return, the value of the last statement is used (like Lisp)
-                final_return_value = stmt_result
-
-        # The scope is still present here, after body execution / return detection
-        self.env.pop_scope()
-
-        return final_return_value # Return the determined value
+            return final_return_value # Return the determined value
+        finally:
+            # Remove function from call stack even if an exception occurs
+            self.call_stack.pop()
 
     def _handle_macro_call(self, ctx, macro_name=None, args=None):
         """Handle execution of a macro"""
@@ -893,16 +1018,26 @@ class Interpreter(
     LoopVisitor,        # Inherits BaseInterpreter
     FunctionVisitor     # Inherits BaseInterpreter
 ):
-    def __init__(self):
+    def __init__(self, max_execution_time=300.0, max_recursion_depth=1000):
         # Ensure super().__init__() calls the correct chain
         super().__init__()
         # Initialize environment and built-ins specifically for Interpreter instance
         self.env = SymbolTable()
+        self.call_stack = []  # Initialize call stack for recursion tracking
+        self.max_recursion_depth = max_recursion_depth  # Set configurable max recursion depth
+        self.max_execution_time = max_execution_time  # Set configurable execution time limit (300 seconds = 5 minutes)
+        self.start_time = time.time()  # Reset timer at initialization
+        self.visit_count = 0  # Counter to avoid checking timeout too frequently
         BuiltInFunctions.register_defaults()
-
+        
     def visit(self, tree):
         """Override visit with error handling"""
         try:
+            # Only check timeout occasionally to avoid performance impact
+            self.visit_count += 1
+            if self.visit_count % 1000 == 0:  # Only check every 1000 visits
+                self.check_timeout()
+                
             # The super().visit() will correctly traverse the MRO
             return super().visit(tree)
         except OnionRuntimeError as e:

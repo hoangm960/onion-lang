@@ -1,7 +1,7 @@
-# If-Elif-Else Tests
+#If-Elif-Else Tests
 (let grade 85)
 
-((if (>= grade 90)
+(if (>= grade 90)
     (print "A")
   (elif (>= grade 80)
         (print "B"))
@@ -9,5 +9,5 @@
         (print "C"))
   (else
         (print "F"))
-))
+)
 

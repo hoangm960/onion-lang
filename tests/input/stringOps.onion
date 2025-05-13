@@ -1,0 +1,28 @@
+# Test string operations and interpolation
+(let message "Hello, Onion!")
+
+# String length
+(print f"The message has (len message) characters")
+
+# Access by index
+(print f"First character: (id 0 message)")
+(print f"Last character: (id 12 message)")
+
+# Head and tail
+(print f"Head (first character): (head message)")
+(print f"Tail (rest of string): (tail message)")
+
+# String in a list
+(let words (list "Onion" "is" "amazing"))
+(print f"Words: (words)")
+(print f"Number of words: (len words)")
+(print f"First word: (id 0 words)")
+
+# Instead of nested operations, use variables
+(let first_word (id 0 words))
+(print f"Length of first word: (len first_word)")
+
+# Multi-char string operations
+(let str1 "Hello")
+(let str2 "World")
+(print (+ str1 ", " str2 "!")) 

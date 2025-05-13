@@ -1,0 +1,30 @@
+# Test the string interpolation feature
+# Similar to Python's f-strings but using () instead of {}
+
+# Define some variables
+(let name "Onion")
+(let age 1)
+(let pi 3.14159)
+(let is_cool true)
+(let numbers (list 1 2 3 4 5))
+
+# Simple string interpolation with a single variable
+(print f"Programming language: (name)")
+
+# Multiple variables in a string
+(print f"(name) is (age) year old and has value of pi = (pi)")
+
+# Boolean values
+(print f"Is (name) cool? (is_cool)!")
+
+# With list values
+(let first (id 0 numbers))
+(print f"The first number is (first) and the length is (len numbers)")
+
+# Numbers and arithmetic
+(let x 10)
+(let y 20)
+(print f"x = (x) and y = (y)")
+
+# Trying to use a non-existent variable
+(print f"This will cause an error: (non_existent_var)") 

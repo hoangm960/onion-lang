@@ -31,7 +31,7 @@ assignment:
 	'let' IDENTIFIER (expression | ternaryExpr)
 	| 'let' ( '(' IDENTIFIER (expression | ternaryExpr) ')')+;
 
-expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
+expression: literal | IDENTIFIER | '(' compoundExpr ')';
 
 compoundExpr:
     arithmeticExpr # Arithmetic
@@ -44,11 +44,6 @@ compoundExpr:
   | ternaryExpr # Ternary
   | listOpExpr # ListOp
 ;
-
-// Allow inc/dec to be used in expressions
-incDecExpr:
-	'inc' IDENTIFIER 
-	| 'dec' IDENTIFIER;
 
 arithmeticExpr:
 	'+' expression+
@@ -102,8 +97,8 @@ loopStatement:
 listOpExpr:
 	'head' expression
 	| 'tail' expression
-	| 'getid' expression expression //getid index list
-	| 'sizeof' expression;
+	| 'id' expression expression //getid index list
+	| 'len' expression;
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
 macroDef:
@@ -120,7 +115,7 @@ block: statement+;
 
 appendStmt: 'append' IDENTIFIER expression;
 
-literal: INT | FLOAT | BOOL | STRING;
+literal: INT | FLOAT | BOOL | STRING | FSTRING;
 
 // Keywords as Tokens (matched before IDENTIFIER)
 BOOL: 'true' | 'false';
@@ -137,6 +132,7 @@ COLON: ':';
 INT: '-'? [0-9]+;
 FLOAT: '-'? [0-9]* '.' [0-9]+;
 STRING: '"' (~["\r\n])*? '"';
+FSTRING: 'f"' (~["\r\n])*? '"';
 
 // Identifier (comes AFTER specific keywords like BOOL)
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;

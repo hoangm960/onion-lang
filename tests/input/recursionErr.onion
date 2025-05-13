@@ -1,0 +1,9 @@
+# This function calls itself recursively with no base case
+# It will trigger the maximum recursion depth error
+(def infinite_recursion (n)
+    (print n)  # Print the current recursion depth
+    (return (infinite_recursion (+ n 1)))  # Recursively call with incremented value
+)
+
+# Start the recursion with value 1
+(print (infinite_recursion 1))
