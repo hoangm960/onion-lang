@@ -6,3 +6,6 @@ generated/*
 !generated/__init__.py
 tests/output/
 tests/semantics/output/
+build/
+dist/
+main.spec
