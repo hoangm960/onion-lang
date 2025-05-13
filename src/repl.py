@@ -55,21 +55,35 @@ def run_onion_file(filename, interpreter, save_ast=False):
 
                 print(f"Beautified AST saved to: {output_filename}")
 
-            # Execute the code
-            result = interpreter.visit(tree)
+            try:
+                # Execute the code
+                result = interpreter.visit(tree)
 
-            # Print the result if it's meaningful
-            if result is not None:
-                print(f"Result: {result}")
+                # Print the result if it's meaningful
+                if result is not None:
+                    print(f"Result: {result}")
 
-            return result
+                return result
+            except Exception as e:
+                # Show a cleaner error message
+                error_message = str(e)
+                if error_message:
+                    print(f"Error: {error_message}")
+                else:
+                    print(f"Error: {e.__class__.__name__}")
+                
+                # Uncomment for debugging
+                # import traceback
+                # traceback.print_exc()
+                return None
         else:
             print("Failed to parse the file")
             return None
     except Exception as e:
-        print(f"Error running file: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error: {str(e)}")
+        # Uncomment for debugging
+        # import traceback
+        # traceback.print_exc()
         return None
 
 def clear_screen():
@@ -141,14 +155,37 @@ def main():
                 parser = Parser()
                 tree = parser.parse_input(line)
                 if tree:
-                    result = interpreter.visit(tree)
-                    if result is not None:
-                        print(f"Result: {result}")
+                    try:
+                        result = interpreter.visit(tree)
+                        if result is not None:
+                            print(f"Result: {result}")
+                    except Exception as e:
+                        # Get the original error message without traceback
+                        error_message = str(e)
+                        if error_message:
+                            print(f"Error: {error_message}")
+                        else:
+                            # If error message is empty, get the error class
+                            print(f"Error: {e.__class__.__name__}")
+                            
+                        # Uncomment for debugging
+                        # import traceback
+                        # traceback.print_exc()
         except KeyboardInterrupt:
             print("\nBye!")
             break
         except Exception as e:
-            print(f"Error: {e}")
+            # Get the original error message without traceback
+            error_message = str(e)
+            if error_message:
+                print(f"Error: {error_message}")
+            else:
+                # If error message is empty, get the error class
+                print(f"Error: {e.__class__.__name__}")
+                
+            # Uncomment for debugging
+            # import traceback
+            # traceback.print_exc()
 
 if __name__ == "__main__":
     main()

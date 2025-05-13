@@ -1,9 +1,10 @@
-(def add5(x)
-    (+ 5 x)
+#(def add5(x)
+#    (+ 5 x)
+#)
+
+
+(def foo(n)
+    (print n)
 )
-(def main()
-    (let x 8)
-    (add5 x)
-    (print x)
-)
-(main)
+#(main)
+(print (foo 3))
