@@ -1,0 +1,7 @@
+# Simple test for string interpolation
+(let name "Onion")
+(let age 1)
+
+# Test simple variable interpolation
+(print f"Hello, (name)!")
+(print f"The language is (age) year old.") 

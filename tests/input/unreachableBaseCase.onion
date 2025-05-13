@@ -1,0 +1,15 @@
+# This example has a base case but will never reach it
+# It demonstrates how a poorly designed recursive function can still cause stack overflow
+
+(def countdown (n)
+    (print n)  # Print the current value
+    
+    # Base case that will never be reached because we're increasing instead of decreasing
+    (if (== n 0)
+        (return "Done!")
+        (countdown (+ n 1))  # Keep increasing instead of decreasing
+    )
+)
+
+# Start the countdown from 1
+(countdown 1) 

@@ -361,8 +361,8 @@ class ExpressionVisitor(BaseInterpreter):
                 value = self.env.lookup(var_name)
                 if value is None:
                     raise OnionNameError(f"Variable '{var_name}' not found in string interpolation")
-                if not isinstance(value, list):
-                    raise OnionTypeError(f"Expected a list but got {type(value).__name__}")
+                if not isinstance(value, (list, str)):
+                    raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
                 return str(len(value))
             
             # Handle nested expressions by checking if it contains spaces
@@ -601,58 +601,62 @@ class ListVisitor(BaseInterpreter):
         return handlers[op](ctx)
 
     def _handle_head(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        self._validate_non_empty(lst, "head")
-        return lst[0]
+        value = self._resolve_list_or_string(ctx, 0)
+        self._validate_non_empty(value, "head")
+        return value[0]
 
     def _handle_tail(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        self._validate_non_empty(lst, "tail")
-        return lst[1:]
+        value = self._resolve_list_or_string(ctx, 0)
+        self._validate_non_empty(value, "tail")
+        return value[1:]
 
     def _handle_getid(self, ctx):
         if len(ctx.expression()) < 2:
-            raise OnionArgumentError("Requires an index and a list")
+            raise OnionArgumentError("Requires an index and a list or string")
         index = self.visit(ctx.expression(0))
         if not isinstance(index, int):
             raise OnionTypeError(
                 f"Index must be an integer, got {type(index).__name__}"
             )
-        lst = self.visit(ctx.expression(1))
-        if not isinstance(lst, list):
-            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
-        if index < 0 or index >= len(lst):
+        value = self.visit(ctx.expression(1))
+        if not isinstance(value, (list, str)):
+            raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
+        if index < 0 or index >= len(value):
             # Format a clear error message for out of bounds
-            if len(lst) == 0:
-                raise OnionIndexError(f"Cannot access index {index} in an empty list")
+            if len(value) == 0:
+                raise OnionIndexError(f"Cannot access index {index} in an empty {type(value).__name__}")
             elif index < 0:
-                raise OnionIndexError(f"Negative index {index} not allowed. Valid indices are 0 to {len(lst)-1}")
+                raise OnionIndexError(f"Negative index {index} not allowed. Valid indices are 0 to {len(value)-1}")
             else:
-                raise OnionIndexError(f"Index {index} out of range. Valid indices are 0 to {len(lst)-1}")
-        return lst[index]
+                raise OnionIndexError(f"Index {index} out of range. Valid indices are 0 to {len(value)-1}")
+        return value[index]
 
     def _handle_sizeof(self, ctx):
-        lst = self._resolve_list(ctx, 0)
-        return len(lst)
-
-    def _resolve_list(self, ctx, expr_index):
+        value = self._resolve_list_or_string(ctx, 0)
+        return len(value)
+        
+    def _resolve_list_or_string(self, ctx, expr_index):
         # Prefer explicit expression argument
         if len(ctx.expression()) > expr_index:
-            lst = self.visit(ctx.expression(expr_index))
+            value = self.visit(ctx.expression(expr_index))
         else:
             # Fallback: next token after op is an identifier
             var_name = ctx.getChild(expr_index + 1).getText()
             try:
-                lst = self.env.resolve(var_name)
+                value = self.env.resolve(var_name)
             except NameError:
                 raise OnionNameError(f"Variable '{var_name}' is not defined")
-        if not isinstance(lst, list):
-            raise OnionTypeError(f"Expected a list but got {type(lst).__name__}")
-        return lst
+                
+        # Check if it's a list or string
+        if not isinstance(value, (list, str)):
+            raise OnionTypeError(f"Expected a list or string but got {type(value).__name__}")
+            
+        return value
 
-    def _validate_non_empty(self, lst, op):
-        if not lst:
-            raise OnionEmptyListError(f"Cannot perform '{op}' on empty list")
+    def _validate_non_empty(self, value, op):
+        if not value:
+            value_type = "list" if isinstance(value, list) else "string"
+            raise OnionEmptyListError(f"Cannot perform '{op}' on empty {value_type}")
 
 
 class ConditionalVisitor(BaseInterpreter):
