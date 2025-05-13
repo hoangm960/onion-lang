@@ -67,6 +67,11 @@ The grammar file is located at: `grammar/Onion.g4`. After making changes, regene
 ```bash
 antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
 ```
+## Packaging
+To package the application run:
+```bash
+pyinstaller --onefile main.py
+```
 
 ## Using the REPL (Read-Evaluate-Print Loop)
 
