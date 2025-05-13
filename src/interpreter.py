@@ -522,8 +522,8 @@ class ListVisitor(BaseInterpreter):
         handlers = {
             "head": self._handle_head,
             "tail": self._handle_tail,
-            "getid": self._handle_getid,
-            "sizeof": self._handle_sizeof,
+            "id": self._handle_getid,
+            "len": self._handle_sizeof,
         }
         if op not in handlers:
             raise OnionNameError(f"Unknown list operation '{op}'")
@@ -541,7 +541,7 @@ class ListVisitor(BaseInterpreter):
 
     def _handle_getid(self, ctx):
         if len(ctx.expression()) < 2:
-            raise OnionArgumentError("getid requires an index and a list")
+            raise OnionArgumentError("Requires an index and a list")
         index = self.visit(ctx.expression(0))
         if not isinstance(index, int):
             raise OnionTypeError(

@@ -97,8 +97,8 @@ loopStatement:
 listOpExpr:
 	'head' expression
 	| 'tail' expression
-	| 'getid' expression expression //getid index list
-	| 'sizeof' expression;
+	| 'id' expression expression //getid index list
+	| 'len' expression;
 
 // Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
 macroDef:
