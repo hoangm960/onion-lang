@@ -4,8 +4,6 @@
         (else (return (* n (fact (- n 1)))))
     )
 )
-(print (fact 5))
 (print (factorial 5))
 
-120
 120

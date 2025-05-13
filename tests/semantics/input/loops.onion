@@ -1,11 +1,13 @@
 (let i 0)
-    (while (< i 3)
-        (print i)
-        (inc i)
+    (while (< i 3) (
+            (print i)
+            (inc i)
+        )
     )
 (let count 0)
-    (repeat 4
-        (inc count)
+    (repeat 4 (
+            (inc count)
+        )
     )
 (print count)
 

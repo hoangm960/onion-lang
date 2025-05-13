@@ -1,0 +1,5 @@
+(print (typeof 123))         
+(print (typeof "Hi"))
+
+int
+string

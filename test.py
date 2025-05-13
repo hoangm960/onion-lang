@@ -56,6 +56,7 @@ class SemanticTest(FileTestCase):
         self.interpreter = Interpreter()
 
     def runTest(self):
+        print(f"Testing file: {self.file_path}")
         test_data = None
         with open(self.file_path) as fin:
             test_data = fin.read()
@@ -64,7 +65,6 @@ class SemanticTest(FileTestCase):
             raise Exception("File empty")
         code, expectedOutput = test_data.split("\n\n")
         self.assertOutput(code, expectedOutput)
-
 
 def get_suite():
     suite = unittest.TestSuite()

@@ -13,57 +13,55 @@ def get_ast_as_string(tree, parser):
         return beautify_parse_tree(raw_tree)
     return "No AST generated - parsing failed"
 
-def run_onion_file(filename, interpreter, save_ast=True):
+def run_onion_file(filename, interpreter, save_ast=False):
     """Execute an Onion file and optionally save its AST"""
     try:
         # Default to tests/input directory if only filename is provided
         if not os.path.isabs(filename) and os.path.dirname(filename) == '':
             default_dir = os.path.join('tests', 'input')
             filename = os.path.join(default_dir, filename)
-            
+
         # Add .onion extension if missing
         if not filename.endswith('.onion'):
             filename = filename + '.onion'
-        
+
         if not os.path.exists(filename):
             print(f"Error: File '{filename}' not found")
             return None
-        
-        print(f"Running file: {filename}")
-        
+
         with open(filename, 'r', encoding='utf-8') as file:
             content = file.read()
-        
+
         parser = Parser()
         tree = parser.parse_input(content)
-        
+
         if tree:
             # Create AST output if requested
             if save_ast:
                 # Create output directory if it doesn't exist
                 output_dir = os.path.join('tests', 'output')
                 os.makedirs(output_dir, exist_ok=True)
-                
+
                 # Create output filename
                 base_filename = os.path.basename(filename)
-                output_filename = os.path.join(output_dir, 
+                output_filename = os.path.join(output_dir,
                                               os.path.splitext(base_filename)[0] + '.ast.txt')
-                
+
                 # Save beautified AST to file
                 ast_str = get_ast_as_string(tree, parser)
                 with open(output_filename, 'w', encoding='utf-8') as out_file:
                     out_file.write(f"# AST for {base_filename}\n\n")
                     out_file.write(ast_str)
-                
+
                 print(f"Beautified AST saved to: {output_filename}")
-            
+
             # Execute the code
             result = interpreter.visit(tree)
-            
+
             # Print the result if it's meaningful
             if result is not None:
                 print(f"Result: {result}")
-                
+
             return result
         else:
             print("Failed to parse the file")
@@ -86,9 +84,9 @@ ONION REPL COMMANDS:
 - run <filename>       : Run a file from tests/input directory
                         (if only filename provided) or from custom path
                         Example: run binary_search_test
-                        
+
 - clear                : Clear the terminal screen
-                        
+
 - reset                : Reset the interpreter state (clear memory)
 
 - help                 : Show this help message
@@ -107,22 +105,22 @@ CODE EXAMPLES:
 
 def main():
     interpreter = Interpreter()
-    
+
     # Check if a file was specified as command line argument
     if len(sys.argv) > 1:
         filename = sys.argv[1]
         run_onion_file(filename, interpreter)
         return
-    
+
     # Interactive mode
     print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
     print("Type 'help' for available commands")
-    
+
     while True:
         try:
             line = input(">>> ").strip()
             tokens = line.split()
-            
+
             if line.strip().lower() in ('exit', 'quit'):
                 break
             elif line == "":
