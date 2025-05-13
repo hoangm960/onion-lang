@@ -5,7 +5,7 @@
 (def binary_search (lst low high target)
     # Base case: not found
     (if (> low high)
-        (return -1))
+        (return -1)
         (else
             # Calculate middle index
             (let mid (// (+ low high) 2))
