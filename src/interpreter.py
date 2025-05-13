@@ -10,7 +10,7 @@ from src.exceptions import (OnionArgumentError, OnionNameError,
                             OnionPrintError, OnionRuntimeError, OnionTypeError)
 from src.symbol_table import SymbolTable
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class ReturnValue:
@@ -90,7 +90,7 @@ class BaseInterpreter(OnionVisitor):
                         closing_paren = ctx.getChild(i+3)
 
                         # Basic structural check for '(' IDENTIFIER (expression | ternaryExpr) ')'
-                        if isinstance(var_name_node, TerminalNode) and ctx.parser.ruleNames[var_name_node.symbol.type -1] == 'IDENTIFIER' and \
+                        if isinstance(var_name_node, TerminalNode) and var_name_node.symbol.type == OnionParser.IDENTIFIER and \
                            (isinstance(expr_node, OnionParser.ExpressionContext) or isinstance(expr_node, OnionParser.TernaryExprContext)) and \
                            isinstance(closing_paren, TerminalNode) and closing_paren.getText() == ')':
 

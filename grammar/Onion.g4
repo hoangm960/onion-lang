@@ -31,7 +31,7 @@ assignment:
 	'let' IDENTIFIER (expression | ternaryExpr)
 	| 'let' ( '(' IDENTIFIER (expression | ternaryExpr) ')')+;
 
-expression: literal | IDENTIFIER | '(' compoundExpr ')' | '(' incDecExpr ')';
+expression: literal | IDENTIFIER | '(' compoundExpr ')';
 
 compoundExpr:
     arithmeticExpr # Arithmetic
@@ -44,11 +44,6 @@ compoundExpr:
   | ternaryExpr # Ternary
   | listOpExpr # ListOp
 ;
-
-// Allow inc/dec to be used in expressions
-incDecExpr:
-	'inc' IDENTIFIER 
-	| 'dec' IDENTIFIER;
 
 arithmeticExpr:
 	'+' expression+
