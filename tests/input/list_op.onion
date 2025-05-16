@@ -18,8 +18,8 @@
 # Try tail with a variable
 (print (tail a))  # Should print [20, 30]
 
-# Try getid with an index expression
-(print (getid (+ 1 0) a))  # Should print 20
+# Try id with an index expression
+(print (id (+ 1 0) a))  # Should print 20
 
 # Create a nested list
 (let nested (list a b))
@@ -27,6 +27,6 @@
 # Try head with a nested list
 (print (head nested))  # Should print [10, 20, 30]
 
-# Try getid with a nested list and then apply head
-(let inner (getid 1 nested))
+# Try id with a nested list and then apply head
+(let inner (id 1 nested))
 (print (head inner))  # Should print 40 

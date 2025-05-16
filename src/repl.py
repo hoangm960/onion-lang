@@ -1,191 +1,198 @@
 from src.interpreter import Interpreter
 from src.parser import Parser
 from generated.OnionParser import OnionParser
-from src.utils import beautify_parse_tree
 import os
 import sys
 
-def get_ast_as_string(tree, parser):
-    """Generate a string representation of the AST for a given parse tree"""
-    if tree:
-        raw_tree = parser.get_str_tree()
-        # Beautify the parse tree for better readability
-        return beautify_parse_tree(raw_tree)
-    return "No AST generated - parsing failed"
-
-def run_onion_file(filename, interpreter, save_ast=False):
-    """Execute an Onion file and optionally save its AST"""
-    try:
-        # Default to tests/input directory if only filename is provided
-        if not os.path.isabs(filename) and os.path.dirname(filename) == '':
-            default_dir = os.path.join('tests', 'input')
-            filename = os.path.join(default_dir, filename)
-
-        # Add .onion extension if missing
-        if not filename.endswith('.onion'):
-            filename = filename + '.onion'
-
-        if not os.path.exists(filename):
-            print(f"Error: File '{filename}' not found")
-            return None
-
-        with open(filename, 'r', encoding='utf-8') as file:
-            content = file.read()
-
-        parser = Parser()
-        tree = parser.parse_input(content)
-
-        if tree:
-            # Create AST output if requested
-            if save_ast:
-                # Create output directory if it doesn't exist
-                output_dir = os.path.join('tests', 'output')
-                os.makedirs(output_dir, exist_ok=True)
-
-                # Create output filename
-                base_filename = os.path.basename(filename)
-                output_filename = os.path.join(output_dir,
-                                              os.path.splitext(base_filename)[0] + '.ast.txt')
-
-                # Save beautified AST to file
-                ast_str = get_ast_as_string(tree, parser)
-                with open(output_filename, 'w', encoding='utf-8') as out_file:
-                    out_file.write(f"# AST for {base_filename}\n\n")
-                    out_file.write(ast_str)
-
-                print(f"Beautified AST saved to: {output_filename}")
-
-            try:
-                # Execute the code
-                result = interpreter.visit(tree)
-
-                # Print the result if it's meaningful
-                if result is not None:
-                    print(f"Result: {result}")
-
-                return result
-            except Exception as e:
-                # Show a cleaner error message
-                error_message = str(e)
-                if error_message:
-                    print(f"Error: {error_message}")
-                else:
-                    print(f"Error: {e.__class__.__name__}")
-                
-                # Uncomment for debugging
-                # import traceback
-                # traceback.print_exc()
-                return None
-        else:
-            print("Failed to parse the file")
-            return None
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        # Uncomment for debugging
-        # import traceback
-        # traceback.print_exc()
-        return None
-
-def clear_screen():
-    """Clear the terminal screen"""
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def show_help():
-    """Display REPL usage help"""
-    help_text = """
+class OnionREPL:
+    """
+    A REPL (Read-Evaluate-Print-Loop) for the Onion programming language.
+    This REPL supports interactive evaluation of expressions and statements.
+    """
+    
+    def __init__(self):
+        self.interpreter = Interpreter(is_repl_mode=True)
+        
+    def clear_screen(self):
+        """Clear the terminal screen"""
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
+    def show_help(self):
+        """Display REPL usage help"""
+        help_text = """
 ONION REPL COMMANDS:
 -------------------
-- run <filename>       : Run a file from tests/input directory
-                        (if only filename provided) or from custom path
-                        Example: run binary_search_test
+- help              : Show this help message
+- clear             : Clear the terminal screen
+- reset             : Reset the interpreter (clear all variables)
+- env               : Show current environment (variables)
+- run <filename>    : Run an Onion program file
+- exit, quit        : Exit the REPL
 
-- clear                : Clear the terminal screen
-
-- reset                : Reset the interpreter state (clear memory)
-
-- help                 : Show this help message
-
-- exit, quit           : Exit the REPL
-
-CODE EXAMPLES:
-------------
-- Variable assignment  : (let x 5)
-- Arithmetic           : (+ x 3)
-- Print                : (print x)
-- List                 : (list 1 2 3)
-- Logical operations   : (& true false), (| true false)
+EXPRESSION EXAMPLES:
+-----------------
+- Arithmetic:       (+ 1 2 3), (- 10 5), (* 2 3 4), (/ 10 2)
+- Variables:        (let x 5), (let y:int 10)
+- Print:            (print "Hello"), (println x)
+- Function calls:   (func arg1 arg2)
+- String operations:(+ "Hello " "World"), (* "Hi" 3)
+- List operations:  (head (list 1 2 3)), (len mylist)
+- Conditionals:     (if (> x 10) "big" : "small")
 """
-    print(help_text)
-
-def main():
-    interpreter = Interpreter()
-
-    # Check if a file was specified as command line argument
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
-        run_onion_file(filename, interpreter)
-        return
-
-    # Interactive mode
-    print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
-    print("Type 'help' for available commands")
-
-    while True:
-        try:
-            line = input(">>> ").strip()
-            tokens = line.split()
-
-            if line.strip().lower() in ('exit', 'quit'):
-                break
-            elif line == "":
-                continue
-            elif line.lower() == "help":
-                show_help()
-            elif line.lower() == "clear":
-                clear_screen()
-            elif line.lower() == "reset":
-                interpreter = Interpreter() # Re-initialize the interpreter
-                print("Interpreter state has been reset.")
-            elif line.lower().startswith("run "):
-                # Extract filename from command
-                filename = line[4:].strip()
-                run_onion_file(filename, interpreter)
+        print(help_text)
+        
+    def show_environment(self):
+        """Display current variables in the environment"""
+        # Get the top-level scope from the interpreter
+        if not self.interpreter.env.scopes:
+            print("Environment is empty.")
+            return
+            
+        # Get the global scope (first scope in the stack)
+        global_scope = self.interpreter.env.scopes[0]
+        
+        if not global_scope:
+            print("No variables defined.")
+            return
+            
+        print("Current variables:")
+        print("------------------")
+        for name, value in sorted(global_scope.items()):
+            # Format the value based on its type
+            if isinstance(value, str):
+                formatted_value = f'"{value}"'
+            elif isinstance(value, list):
+                formatted_value = f"[{', '.join(map(str, value))}]"
             else:
-                # Try to parse and evaluate the line as Onion code
-                parser = Parser()
-                tree = parser.parse_input(line)
-                if tree:
-                    try:
-                        result = interpreter.visit(tree)
-                        if result is not None:
-                            print(f"Result: {result}")
-                    except Exception as e:
-                        # Get the original error message without traceback
-                        error_message = str(e)
-                        if error_message:
-                            print(f"Error: {error_message}")
-                        else:
-                            # If error message is empty, get the error class
-                            print(f"Error: {e.__class__.__name__}")
-                            
-                        # Uncomment for debugging
-                        # import traceback
-                        # traceback.print_exc()
-        except KeyboardInterrupt:
-            print("\nBye!")
-            break
-        except Exception as e:
-            # Get the original error message without traceback
-            error_message = str(e)
-            if error_message:
-                print(f"Error: {error_message}")
-            else:
-                # If error message is empty, get the error class
-                print(f"Error: {e.__class__.__name__}")
+                formatted_value = str(value)
                 
-            # Uncomment for debugging
-            # import traceback
-            # traceback.print_exc()
-
+            print(f"{name} = {formatted_value}")
+    
+    def run_file(self, filename):
+        """Run an Onion program file"""
+        try:
+            # Add .onion extension if missing
+            if not filename.endswith('.onion'):
+                filename = filename + '.onion'
+                
+            # Support relative paths from tests/input directory
+            if not os.path.isabs(filename) and not os.path.exists(filename):
+                test_path = os.path.join('tests', 'input', filename)
+                if os.path.exists(test_path):
+                    filename = test_path
+            
+            if not os.path.exists(filename):
+                print(f"Error: File '{filename}' not found")
+                return
+                
+            # Read the file content
+            with open(filename, 'r', encoding='utf-8') as file:
+                content = file.read()
+                
+            # Parse the file
+            parser = Parser()
+            tree = parser.parse_input(content)
+            
+            if not tree:
+                print(f"Error: Failed to parse '{filename}'")
+                return
+                
+            # Execute the program in the current interpreter
+            result = self.interpreter.visit(tree)
+            if result is not None:
+                print(f"Result: {result}")
+                
+        except Exception as e:
+            print(f"Error executing '{filename}': {str(e)}")
+        
+    def parse_input(self, input_text):
+        """
+        Parse the input text, trying different strategies to make it user-friendly.
+        1. Try parsing it as a full program (with statements)
+        2. If that fails, try parsing as an expression
+        3. If that fails too, try wrapping it in parentheses for a statement
+        """
+        parser = Parser()
+        
+        # First try to parse as a full program
+        try:
+            tree = parser.parse_input(input_text)
+            if tree:
+                return tree
+        except Exception:
+            pass  # Silently continue to next strategy
+            
+        # Next try to parse as an expression
+        try:
+            tree = parser.parse_expression(input_text)
+            if tree:
+                return tree
+        except Exception:
+            pass  # Silently continue to next strategy
+            
+        # Finally, try wrapping in parentheses if it's not already
+        if not (input_text.startswith('(') and input_text.endswith(')')):
+            try:
+                wrapped_input = f"({input_text})"
+                return parser.parse_input(wrapped_input)
+            except Exception:
+                pass  # Silently fail
+                
+        # All parsing strategies failed
+        return None
+        
+    def start(self):
+        """Start the Onion REPL"""
+        print("🧅 Onion REPL - type 'exit' or Ctrl+C to quit")
+        print("Type 'help' for available commands")
+        
+        while True:
+            try:
+                # Read input from user
+                user_input = input("onion> ").strip()
+                
+                # Handle special commands
+                if user_input.lower() in ('exit', 'quit'):
+                    print("Goodbye!")
+                    break
+                elif user_input == "":
+                    continue
+                elif user_input.lower() == "help":
+                    self.show_help()
+                elif user_input.lower() == "clear":
+                    self.clear_screen()
+                elif user_input.lower() == "reset":
+                    self.interpreter = Interpreter(is_repl_mode=True)
+                    print("Interpreter state has been reset.")
+                elif user_input.lower() == "env":
+                    self.show_environment()
+                elif user_input.lower().startswith("run "):
+                    # Extract filename and run it
+                    filename = user_input[4:].strip()
+                    self.run_file(filename)
+                else:
+                    # Parse and evaluate the input
+                    tree = self.parse_input(user_input)
+                    
+                    if tree:
+                        try:
+                            result = self.interpreter.visit(tree)
+                            if result is not None:
+                                print(result)
+                        except Exception as e:
+                            print(f"Error: {str(e)}")
+                    else:
+                        print("Error: Failed to parse input")
+            
+            except KeyboardInterrupt:
+                print("\nBye!")
+                break
+            except Exception as e:
+                print(f"Error: {str(e)}")
+                
+def main():
+    repl = OnionREPL()
+    repl.start()
+    
 if __name__ == "__main__":
     main()

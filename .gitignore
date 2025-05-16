@@ -4,5 +4,5 @@ __pycache__/
 .venv/
 generated/*
 !generated/__init__.py
-tests/output/
-tests/semantics/output/
+tests/
+build/

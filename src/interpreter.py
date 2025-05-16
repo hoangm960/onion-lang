@@ -18,6 +18,110 @@ from src.symbol_table import SymbolTable
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+class TypeChecker:
+    """Handles type checking based on type declarations in the language."""
+    
+    @staticmethod
+    def get_type_from_typedec(type_dec_node):
+        """Extract the type name from a TypeDecContext."""
+        if type_dec_node is None:
+            return None
+            
+        # Type declaration format: ':' type
+        # The type name is the second child after the colon
+        if type_dec_node.getChildCount() >= 2:
+            type_node = type_dec_node.getChild(1)
+            return type_node.getText()
+        return None
+        
+    @staticmethod
+    def get_python_type(type_name):
+        """Convert an Onion type name to a Python type."""
+        if type_name is None:
+            return None
+        
+        # Handle generic type for lists, e.g., 'list:int'
+        if ":" in type_name:
+            base_type, element_type = type_name.split(":", 1)
+            if base_type.lower() == 'list':
+                return list  # Return list type; element type checked separately
+            
+        # Basic types    
+        type_map = {
+            'int': int,
+            'float': float, 
+            'string': str,
+            'bool': bool,
+            'list': list,
+            'void': type(None)
+        }
+        
+        return type_map.get(type_name.lower())
+    
+    @staticmethod
+    def get_element_type(type_name):
+        """Extract element type for generic collections."""
+        if type_name is None or ":" not in type_name:
+            return None
+            
+        base_type, element_type = type_name.split(":", 1)
+        if base_type.lower() == 'list':
+            return element_type
+            
+        return None
+        
+    @staticmethod
+    def check_type(value, expected_type_name):
+        """Check if a value matches the expected type."""
+        if expected_type_name is None:
+            return True  # No type constraint
+            
+        # Handle generic types (e.g., 'list:int')
+        if ":" in expected_type_name:
+            base_type, element_type = expected_type_name.split(":", 1)
+            
+            # List with typed elements
+            if base_type.lower() == 'list':
+                # Check if value is a list
+                if not isinstance(value, list):
+                    return False
+                
+                # Check every element in the list
+                for item in value:
+                    if not TypeChecker.check_type(item, element_type):
+                        return False
+                return True
+        
+        # Normal type checking for basic types
+        expected_type = TypeChecker.get_python_type(expected_type_name)
+        if expected_type is None:
+            # Unknown type, cannot check
+            return True
+            
+        # Special case for None value with void type
+        if value is None and expected_type is type(None):
+            return True
+            
+        # Handle numeric type compatibility (int can be assigned to float)
+        if expected_type is float and isinstance(value, int):
+            return True
+            
+        return isinstance(value, expected_type)
+        
+    @staticmethod
+    def type_error_message(value, expected_type_name):
+        """Generate a type error message."""
+        actual_type = type(value).__name__
+        
+        # For collections, include more specific information
+        if isinstance(value, list) and value and ":" in expected_type_name:
+            base_type, element_type = expected_type_name.split(":", 1)
+            element_types = set(type(item).__name__ for item in value)
+            actual_type = f"list of [{', '.join(element_types)}]"
+            
+        return f"Type error: Expected '{expected_type_name}', got '{actual_type}'"
+
+
 class ReturnValue:
     """Lớp bọc giá trị trả về bởi lệnh return."""
 
@@ -26,11 +130,71 @@ class ReturnValue:
         self.value = value
 
 
+class Lambda:
+    """Represents a lambda function with captured environment."""
+    
+    def __init__(self, params, body_expr, capturing_interpreter):
+        self.params = params
+        self.body_expr = body_expr
+        # Don't store the full interpreter, just capture the environment
+        self.env = capturing_interpreter.env.clone()  # Capture the current environment
+
+    def __call__(self, args, calling_interpreter=None):
+        """Makes Lambda instances callable like regular functions."""
+        if len(args) != len(self.params):
+            raise OnionArgumentError(f"Lambda expected {len(self.params)} arguments, got {len(args)}")
+
+        # Must use the calling interpreter, as we no longer store the capturing_interpreter
+        if not calling_interpreter:
+            raise OnionRuntimeError("Lambda requires a calling interpreter")
+        
+        interpreter = calling_interpreter
+        
+        # Save the current environment
+        original_env = interpreter.env
+        
+        # Create a new environment based on the captured environment
+        new_env = self.env.clone()
+        new_env.push_scope()  # Add a new scope for parameters
+        
+        # Define parameters in the new scope
+        for param, arg in zip(self.params, args):
+            new_env.define(param, arg)
+        
+        try:
+            # Set the interpreter's environment to our new environment
+            interpreter.env = new_env
+            
+            # Evaluate the body expression
+            return interpreter.visit(self.body_expr)
+        finally:
+            # Restore the original environment
+            interpreter.env = original_env
+    
+    # Make Lambda pickle-friendly
+    def __getstate__(self):
+        """Return state values to be pickled."""
+        return {
+            'params': self.params,
+            'body_expr': self.body_expr,
+            'env': self.env
+        }
+    
+    def __setstate__(self, state):
+        """Restore state from the unpickled values."""
+        self.params = state['params']
+        self.body_expr = state['body_expr']
+        self.env = state['env']
+            
+    def __str__(self):
+        param_str = " ".join(self.params)
+        return f"<lambda ({param_str})>"
+
+
 class BaseInterpreter(OnionVisitor):
     def __init__(self):
         self.env = SymbolTable()
         self.functions = {}  # Lưu trữ các định nghĩa hàm
-        self.macros = {}  # Lưu trữ các định nghĩa hàm
         self.start_time = time.time()  # Time when execution started
         self.max_execution_time = 300.0  # Default timeout: 5 minutes
         self.last_timeout_check = time.time()  # Track when we last checked timeout
@@ -85,7 +249,19 @@ class BaseInterpreter(OnionVisitor):
     def visitPrintStatement(self, ctx):
         try:
             value = self.visit(ctx.expression())
-            print(value)
+            
+            # Determine if it's print or println based on the first child (token)
+            op = ctx.getChild(0).getText()
+            
+            if op == "println":
+                # println: print with trailing newline (default Python print behavior)
+                print(value)
+            else:
+                # print: print without trailing newline
+                print(value, end='', flush=True)
+                if self.is_repl_mode:
+                    print()  # Add a newline if in REPL mode
+                
             return None
         except OnionRuntimeError as e:
             # Pass through Onion errors directly rather than wrapping them
@@ -93,6 +269,47 @@ class BaseInterpreter(OnionVisitor):
         except Exception as e:
             # Only wrap unexpected non-Onion errors
             raise OnionPrintError(f"Error in print statement: {str(e)}")
+
+    def visitSetStmt(self, ctx: OnionParser.SetStmtContext):
+        """Handles the \'set\' statement: (set IDENTIFIER expression)"""
+        var_name = ctx.IDENTIFIER().getText()
+        
+        # Check if variable exists
+        if self.env.lookup(var_name) is None:
+            raise OnionNameError(f"Cannot set variable \'{var_name}\' because it has not been declared with \'let\'.")
+
+        # Get the original type if declared (this is a simplification, full type tracking is complex)
+        # For now, we rely on the TypeChecker within the assignment logic of SymbolTable or direct type checks.
+        # A more robust solution would store type info in SymbolTable upon \'let\' declaration.
+        original_value = self.env.lookup(var_name)
+        original_type_name = None
+        if isinstance(original_value, int): original_type_name = "int"
+        elif isinstance(original_value, float): original_type_name = "float"
+        elif isinstance(original_value, str): original_type_name = "string"
+        elif isinstance(original_value, bool): original_type_name = "bool"
+        elif isinstance(original_value, list): original_type_name = "list"
+        # Not perfectly tracking \'void\' or complex list types here, but good for basic reassignment.
+
+        new_value = self.visit(ctx.getChild(2)) # child(0)=\'set\', child(1)=IDENTIFIER, child(2)=expression or ternaryExpr
+
+        # Type check if original type was inferred/known
+        if original_type_name:
+            if not TypeChecker.check_type(new_value, original_type_name):
+                # Allow int to float promotion implicitly
+                if original_type_name == "float" and isinstance(new_value, int):
+                    pass # This is fine
+                else:
+                    raise OnionTypeError(
+                        f"Cannot set \'{var_name}\': " +
+                        TypeChecker.type_error_message(new_value, original_type_name)
+                    )
+        
+        # Update the variable in the current or an outer scope
+        # The SymbolTable.define method should handle finding and updating the variable.
+        # If SymbolTable.define only adds to the current scope, we need SymbolTable.update or similar.
+        # Assuming SymbolTable.define can update existing variables in outer scopes if found.
+        self.env.define(var_name, new_value) # SymbolTable.define should overwrite if var_name exists
+        return None # \'set\' is a statement, returns nothing
 
     def visitAssignment(self, ctx):
         # Check the second child to distinguish assignment types
@@ -111,19 +328,42 @@ class BaseInterpreter(OnionVisitor):
                     # A pair starts at index i, id is at i+1, expr is at i+2, ) is at i+3
                     if i + 3 < ctx.getChildCount():
                         var_name_node = ctx.getChild(i+1)
-                        expr_node = ctx.getChild(i+2)
-                        closing_paren = ctx.getChild(i+3)
-
-                        # Basic structural check for '(' IDENTIFIER (expression | ternaryExpr) ')'
+                        
+                        # Handle type declaration if present
+                        type_node = None
+                        expr_node = None
+                        closing_paren_idx = None
+                        
+                        next_idx = i + 2
+                        if next_idx < ctx.getChildCount() and isinstance(ctx.getChild(next_idx), OnionParser.TypeDecContext):
+                            type_node = ctx.getChild(next_idx)
+                            next_idx += 1
+                        
+                        if next_idx < ctx.getChildCount():
+                            expr_node = ctx.getChild(next_idx)
+                            closing_paren_idx = next_idx + 1
+                        
+                        # Basic structural check for '(' IDENTIFIER (typeDec)? (expression | ternaryExpr) ')'
                         if isinstance(var_name_node, TerminalNode) and var_name_node.symbol.type == OnionParser.IDENTIFIER and \
                            (isinstance(expr_node, OnionParser.ExpressionContext) or isinstance(expr_node, OnionParser.TernaryExprContext)) and \
-                           isinstance(closing_paren, TerminalNode) and closing_paren.getText() == ')':
+                           closing_paren_idx < ctx.getChildCount() and isinstance(ctx.getChild(closing_paren_idx), TerminalNode) and ctx.getChild(closing_paren_idx).getText() == ')':
 
                             var_name = var_name_node.getText()
                             var_value = self.visit(expr_node)
+                            
+                            # Check for redeclaration in the current scope
+                            if self.env.lookup_current_scope(var_name) is not None:
+                                raise OnionNameError(f"Variable '{var_name}' has already been declared in the current scope.")
+
+                            # Type checking if type declaration present
+                            if type_node is not None:
+                                expected_type = TypeChecker.get_type_from_typedec(type_node)
+                                if not TypeChecker.check_type(var_value, expected_type):
+                                    raise OnionTypeError(TypeChecker.type_error_message(var_value, expected_type))
+                                    
                             self.env.define(var_name, var_value)
                             result = var_value # Keep track of the last assigned value
-                            i += 3 # Move index past the processed pair ')'
+                            i = closing_paren_idx # Move index past the processed pair ')'
                         else:
                              raise OnionAssignmentError(f"Malformed multi-assignment pair starting near index {i}")
                     else:
@@ -135,71 +375,130 @@ class BaseInterpreter(OnionVisitor):
         # Case 2: Single or Conditional assignment: 'let' IDENTIFIER ...
         # The second child is an IDENTIFIER
         elif isinstance(second_child, TerminalNode) and second_child.symbol.type == OnionParser.IDENTIFIER:
-             identifier = second_child.getText() # Get identifier text
-             expressions = ctx.expression() # Get all expression nodes
+            identifier = second_child.getText() # Get identifier text
+            
+            # Check for typeDec
+            type_dec = None
+            next_index = 2
+            if next_index < ctx.getChildCount() and isinstance(ctx.getChild(next_index), OnionParser.TypeDecContext):
+                type_dec = ctx.getChild(next_index)
+                next_index += 1
+                
+            # Get expression
+            expr = ctx.getChild(next_index)
+            if isinstance(expr, OnionParser.ExpressionContext) or isinstance(expr, OnionParser.TernaryExprContext):
+                value = self.visit(expr)
+                
+                # Check for redeclaration in the current scope
+                if self.env.lookup_current_scope(identifier) is not None:
+                    raise OnionNameError(f"Variable '{identifier}' has already been declared in the current scope.")
 
-             if len(expressions) == 1: # Simple assignment: let x expr
-                 value = self.visit(expressions[0])
-                 self.env.define(identifier, value)
-                 return value
-             else:
-                 # Should not happen based on the grammar if single/conditional
-                 raise OnionAssignmentError(f"Unexpected number of expressions ({len(expressions)}) in single/conditional assignment for '{identifier}'")
+                # Type checking if type declaration present
+                if type_dec is not None:
+                    expected_type = TypeChecker.get_type_from_typedec(type_dec)
+                    if not TypeChecker.check_type(value, expected_type):
+                        raise OnionTypeError(TypeChecker.type_error_message(value, expected_type))
+                
+                self.env.define(identifier, value)
+                return value
+            else:
+                raise OnionAssignmentError(f"Expected expression after identifier '{identifier}'")
         else:
             # This case should theoretically not be reachable if the grammar is correct
             # and the input parses successfully.
             raise OnionAssignmentError("Unrecognized assignment structure")
 
-    def visitBlock(self, ctx):
-        """Xử lý block các câu lệnh"""
-        result = None
-
-        # Duyệt qua tất cả các statement trong block
-        for i in range(ctx.getChildCount()):
-            stmt = ctx.getChild(i)
-            result = self.visit(stmt)
-
-            # Kiểm tra nếu kết quả là ReturnValue
-            if isinstance(result, ReturnValue):
-                # Gặp lệnh return, dừng việc xử lý block và trả về đối tượng ReturnValue
-                return result
-
-        return result
-
-    def visitIncDecStmt(self, ctx):
-        """Xử lý tăng/giảm biến"""
+    def visitAugmentedAssignment(self, ctx):
+        """Handles augmented assignment operators (+=, -=, *=, /=)"""
+        # Get operator type
         op = ctx.getChild(0).getText()
+        # Get variable name
         var_name = ctx.IDENTIFIER().getText()
+        # Get expression value
+        expr_value = self.visit(ctx.expression())
 
-        # Lấy giá trị hiện tại
+        # Lookup current value
         current_value = self.env.lookup(var_name)
         if current_value is None:
             raise OnionNameError(f"Variable '{var_name}' is not defined")
 
-        if not isinstance(current_value, (int, float)):
-            raise OnionTypeError(
-                f"Cannot increment/decrement non-numeric value: {current_value}"
-            )
-
-        # Calculate new value
-        if op == "inc":
-            new_value = current_value + 1
-        elif op == "dec":
-            new_value = current_value - 1
+        # Get the variable's type information if it exists
+        var_type = None
+        # We would need access to the original declaration to know the variable's type
+        # For now, we'll infer based on the current value
+        if isinstance(current_value, int):
+            var_type = 'int'
+        elif isinstance(current_value, float):
+            var_type = 'float'
+        elif isinstance(current_value, str):
+            var_type = 'string'
+        elif isinstance(current_value, bool):
+            var_type = 'bool'
+        elif isinstance(current_value, list):
+            var_type = 'list'
+            
+        # Calculate new value based on operator
+        if op == "+=":
+            # Handle addition (works for numbers and strings)
+            if isinstance(current_value, (int, float)) and isinstance(expr_value, (int, float)):
+                new_value = current_value + expr_value
+                
+                # Preserve integer type if both are integers
+                if var_type == 'int' and isinstance(expr_value, int):
+                    new_value = int(new_value)
+            elif isinstance(current_value, str) and isinstance(expr_value, str):
+                new_value = current_value + expr_value
+            else:
+                raise OnionTypeError(f"Cannot apply '+=' with types {type(current_value).__name__} and {type(expr_value).__name__}")
+        elif op == "-=":
+            # Only numeric types
+            if isinstance(current_value, (int, float)) and isinstance(expr_value, (int, float)):
+                new_value = current_value - expr_value
+                
+                # Preserve integer type if both are integers
+                if var_type == 'int' and isinstance(expr_value, int):
+                    new_value = int(new_value)
+            else:
+                raise OnionTypeError(f"Cannot apply '-=' with types {type(current_value).__name__} and {type(expr_value).__name__}")
+        elif op == "*=":
+            # Handle multiplication (works for numbers and string*int)
+            if isinstance(current_value, (int, float)) and isinstance(expr_value, (int, float)):
+                new_value = current_value * expr_value
+                
+                # Preserve integer type if both are integers
+                if var_type == 'int' and isinstance(expr_value, int):
+                    new_value = int(new_value)
+            elif isinstance(current_value, str) and isinstance(expr_value, int):
+                new_value = current_value * expr_value
+            else:
+                raise OnionTypeError(f"Cannot apply '*=' with types {type(current_value).__name__} and {type(expr_value).__name__}")
+        elif op == "/=":
+            # Only numeric types
+            if isinstance(current_value, (int, float)) and isinstance(expr_value, (int, float)):
+                if expr_value == 0:
+                    raise OnionDivisionByZeroError("Division by zero")
+                new_value = current_value / expr_value
+                
+                # Preserve integer type for integer division if requested
+                if var_type == 'int' and isinstance(expr_value, int):
+                    new_value = int(new_value)
+            else:
+                raise OnionTypeError(f"Cannot apply '/=' with types {type(current_value).__name__} and {type(expr_value).__name__}")
         else:
-            raise OnionRuntimeError(f"Unknown operation: {op}")
-
-        # Update value in environment
+            raise OnionRuntimeError(f"Unknown augmented assignment operator: {op}")
+            
+        # Ensure the resulting type is compatible with the variable's original type
+        if var_type is not None:
+            if not TypeChecker.check_type(new_value, var_type):
+                raise OnionTypeError(f"Augmented assignment result: " + 
+                                  TypeChecker.type_error_message(new_value, var_type))
+        
+        # Update the variable value
         self.env.define(var_name, new_value)
-        return new_value
-
-    def visitReturnStmt(self, ctx):
-        """Xử lý lệnh return trong hàm"""
-        if ctx.getChildCount() > 1:
-            expr = ctx.getChild(1)  # Phần tử thứ 2 (index 1) sau 'return'
-            value = self.visit(expr) # Triggers lookup if expr is identifier
-            return ReturnValue(value)
-        return ReturnValue(None)
+        
+        # Return None instead of the new value to avoid unintentionally
+        # returning values from functions with void return type
+        return None
 
     def execute_block(self, statements, environment=None):
         """Thực thi khối lệnh với môi trường cục bộ mới."""
@@ -224,16 +523,60 @@ class BaseInterpreter(OnionVisitor):
         condition_result = self.visit(ctx.expression())
 
         if condition_result:
-            # Thực thi khối then
-            result = self.visit(ctx.block(0))
-        else:
-            # Nếu có khối else, thực thi nó
-            if ctx.block(1) is not None:
-                result = self.visit(ctx.block(1))
-            else:
+            # Get and execute then statements (after condition)
+            then_statements = []
+            condition_idx = -1
+            
+            # Find the index of the condition expression
+            for i in range(ctx.getChildCount()):
+                if isinstance(ctx.getChild(i), OnionParser.ExpressionContext):
+                    condition_idx = i
+                    break
+            
+            # Collect all statements after the condition until else or end
+            i = condition_idx + 1
+            while i < ctx.getChildCount():
+                child = ctx.getChild(i)
+                if isinstance(child, TerminalNode) and child.getText() == 'else':
+                    break
+                if isinstance(child, OnionParser.StatementContext):
+                    then_statements.append(child)
+                i += 1
+                
+            # Execute then statements
                 result = None
-
-        return result
+            for stmt in then_statements:
+                result = self.visit(stmt)
+                if isinstance(result, ReturnValue):
+                    break
+            return result
+        else:
+            # Find and execute else statements if they exist
+            else_statements = []
+            else_idx = -1
+            
+            # Find the else token
+            for i in range(ctx.getChildCount()):
+                if isinstance(ctx.getChild(i), TerminalNode) and ctx.getChild(i).getText() == 'else':
+                    else_idx = i
+                    break
+                    
+            if else_idx != -1:
+                # Collect statements after else
+                for i in range(else_idx + 1, ctx.getChildCount()):
+                    child = ctx.getChild(i)
+                    if isinstance(child, OnionParser.StatementContext):
+                        else_statements.append(child)
+                
+                # Execute else statements
+                result = None
+                for stmt in else_statements:
+                    result = self.visit(stmt)
+                    if isinstance(result, ReturnValue):
+                        break
+                return result
+            else:
+                return None
 
     def visitAppendStmt(self, ctx):
         """Visit the append statement: (append list_var element_expr)"""
@@ -248,14 +591,14 @@ class BaseInterpreter(OnionVisitor):
         if not isinstance(lst, list):
             raise OnionTypeError(f"Variable '{var_name}' must be a list to append, got {type(lst).__name__}")
 
-        # Evaluate the element to append
-        element = self.visit(element_expr)
-
-        # Perform the append (modifies the list in place)
-        lst.append(element)
-
-        # Statements typically return None unless they are return statements
-        return None
+        # We should only have one expression (the element to append)
+        if element_expr:
+            element = self.visit(element_expr)
+            lst.append(element)
+                # Return None instead of the list to make append a void operation
+            return None
+        else:
+            raise OnionArgumentError("append requires an element to append")
 
 
 class ExpressionVisitor(BaseInterpreter):
@@ -322,6 +665,14 @@ class ExpressionVisitor(BaseInterpreter):
             return self.visit(ctx.ternaryExpr())
         if ctx.listOpExpr():
             return self.visit(ctx.listOpExpr())
+        if ctx.lambdaExpr():
+            return self.visit(ctx.lambdaExpr())
+        if ctx.filterExpr():
+            return self.visit(ctx.filterExpr())
+        if ctx.reduceExpr():
+            return self.visit(ctx.reduceExpr())
+        if ctx.mapExpr():
+            return self.visit(ctx.mapExpr())
         return None
 
     def visitLiteral(self, ctx):
@@ -409,6 +760,33 @@ class ExpressionVisitor(BaseInterpreter):
         self.env.define(var_name, new_value)
         return new_value
 
+    def visitLambdaExpr(self, ctx):
+        """Handle lambda expressions: (lambda params body_expr)"""
+        # Get parameter identifiers
+        params = []
+        for i in range(ctx.getChildCount()):
+            if i > 0:  # Skip 'lambda' token
+                child = ctx.getChild(i)
+                if isinstance(child, OnionParser.ExpressionContext):
+                    # Found the body expression
+                    break
+                elif hasattr(child, 'symbol') and child.symbol.type == OnionParser.IDENTIFIER:
+                    params.append(child.getText())
+        
+        # Get the body expression
+        body_expr = None
+        for i in range(ctx.getChildCount()):
+            child = ctx.getChild(i)
+            if isinstance(child, OnionParser.ExpressionContext):
+                body_expr = child
+                break
+        
+        if not body_expr:
+            raise OnionRuntimeError("Lambda expression must have a body")
+            
+        # Create lambda function with current environment
+        return Lambda(params, body_expr, self)
+
 
 class ArithmeticVisitor(ExpressionVisitor):
     def visitArithmeticExpr(self, ctx):
@@ -419,6 +797,7 @@ class ArithmeticVisitor(ExpressionVisitor):
             "*": self._handle_multiplication,
             "/": self._handle_division,
             "//": self._handle_integer_division,
+            "%": self._handle_modulo,
         }
         return handlers[op](ctx)
 
@@ -427,10 +806,15 @@ class ArithmeticVisitor(ExpressionVisitor):
         result = self.visit(ctx.getChild(1))
         for i in range(2, ctx.getChildCount()):
             value = self.visit(ctx.getChild(i))
-            # If string then concat
-            if isinstance(result, str) and isinstance(value, str):
-                result = result + value
-            # Else if number then add (can be int or float)
+            
+            # String concatenation with any type
+            if isinstance(result, str):
+                # Convert any value to string for concatenation
+                result = result + str(value)
+            elif isinstance(value, str):
+                # If the second operand is a string, convert the first to string too
+                result = str(result) + value
+            # Numeric addition
             elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
                 result = result + value
             else:
@@ -451,13 +835,38 @@ class ArithmeticVisitor(ExpressionVisitor):
 
     def _handle_multiplication(self, ctx):
         # Multiplication: multiply all child expressions
-        result = 1
-        for i in range(1, ctx.getChildCount()):
-            child = ctx.getChild(i)
-            value = self.visit(child)
+        if ctx.getChildCount() < 2:
+            raise ValueError("Multiplication requires at least one operand")
+            
+        # Get the first value
+        result = self.visit(ctx.getChild(1))
+        if result is None:
+            raise ValueError("Cannot evaluate first multiplication operand")
+            
+        # If there's only one operand, just return it
+        if ctx.getChildCount() == 2:
+            return result
+            
+        # Process remaining operands
+        for i in range(2, ctx.getChildCount()):
+            value = self.visit(ctx.getChild(i))
             if value is None:
                 raise ValueError(f"Cannot evaluate expression at position {i}")
-            result *= value
+                
+            # Handle special case: string * number
+            if isinstance(result, str) and isinstance(value, int):
+                result = result * value
+            # Handle special case: number * string
+            elif isinstance(result, int) and isinstance(value, str):
+                result = value * result
+            # Regular numeric multiplication
+            elif isinstance(result, (int, float)) and isinstance(value, (int, float)):
+                result = result * value
+            else:
+                raise OnionOperationError(
+                    f"Cannot multiply values of type {type(result).__name__} and {type(value).__name__}"
+                )
+                
         return result
 
     def _handle_division(self, ctx):
@@ -482,6 +891,23 @@ class ArithmeticVisitor(ExpressionVisitor):
         if right == 0:
             raise OnionDivisionByZeroError("Integer division by zero")
         return left // right
+
+    def _handle_modulo(self, ctx):
+        """Handle modulo operation: (% expr1 expr2)"""
+        if ctx.getChildCount() != 3:
+            raise SyntaxError("Modulo requires exactly 2 operands")
+        left = self.visit(ctx.getChild(1))
+        right = self.visit(ctx.getChild(2))
+        if left is None or right is None:
+            raise ValueError("Cannot evaluate modulo operands")
+        if right == 0:
+            raise OnionDivisionByZeroError("Modulo by zero")
+        
+        # Ensure integer operands
+        if not isinstance(left, int) or not isinstance(right, int):
+            raise OnionTypeError(f"Modulo requires integer operands, got {type(left).__name__} and {type(right).__name__}")
+        
+        return left % right
 
 
 class BooleanVisitor(ExpressionVisitor):
@@ -574,16 +1000,40 @@ class BooleanVisitor(ExpressionVisitor):
 
 class ListVisitor(BaseInterpreter):
     def visitListExpr(self, ctx):
-        # First child is 'list' keyword, skip it
+        # Create an empty list
         result = []
 
         # Start from index 1 to skip the 'list' keyword
-        for i in range(1, ctx.getChildCount()):
+        start_idx = 1
+        
+        # Check for optional type declaration
+        element_type = None
+        if start_idx < ctx.getChildCount() and isinstance(ctx.getChild(start_idx), OnionParser.TypeDecContext):
+            type_dec = ctx.getChild(start_idx)
+            list_type = TypeChecker.get_type_from_typedec(type_dec)
+            
+            # Check if it's a generic list type (e.g., list:int)
+            element_type = TypeChecker.get_element_type(list_type)
+            
+            # If no element type specified, it's just a basic list
+            if element_type is None and list_type == 'list':
+                element_type = None  # Any type allowed
+                
+            start_idx += 1
+        
+        # Process all expressions and add to list
+        for i in range(start_idx, ctx.getChildCount()):
             child = ctx.getChild(i)
             child_value = self.visit(child)
 
             if child_value is None:
-                raise ValueError(f"Cannot evaluate list element at position {i}")
+                raise ValueError(f"Cannot evaluate list element at position {i-start_idx}")
+                
+            # Type check list elements if a type was specified
+            if element_type is not None:
+                if not TypeChecker.check_type(child_value, element_type):
+                    raise OnionTypeError(f"List element at position {i-start_idx}: " + 
+                                        TypeChecker.type_error_message(child_value, element_type))
 
             result.append(child_value)
         return result
@@ -658,55 +1108,349 @@ class ListVisitor(BaseInterpreter):
             value_type = "list" if isinstance(value, list) else "string"
             raise OnionEmptyListError(f"Cannot perform '{op}' on empty {value_type}")
 
+    def visitFilterExpr(self, ctx):
+        """Handle filter expression: (filter predicate_expr list_expr)"""
+        expressions = ctx.expression()
+        
+        if len(expressions) != 2:
+            raise OnionArgumentError("Filter requires exactly 2 expressions: predicate and list")
+            
+        # Get the predicate and list expressions
+        pred_expr = expressions[0]
+        list_expr = expressions[1]
+        
+        # Evaluate the list expression
+        lst = self.visit(list_expr)
+        
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Second argument of filter must be a list, got {type(lst).__name__}")
+        
+        # Handle direct lambda expression
+        if isinstance(pred_expr, OnionParser.ExpressionContext) and pred_expr.compoundExpr() and \
+           pred_expr.compoundExpr().lambdaExpr():
+            # This is a lambda expression directly in the filter call
+            lambda_expr = pred_expr.compoundExpr().lambdaExpr()
+            result = []
+            
+            # Get lambda parameters
+            params = []
+            for i in range(lambda_expr.getChildCount()):
+                if i > 0:  # Skip 'lambda' token
+                    child = lambda_expr.getChild(i)
+                    if isinstance(child, OnionParser.ExpressionContext):
+                        break
+                    elif hasattr(child, 'symbol') and child.symbol.type == OnionParser.IDENTIFIER:
+                        params.append(child.getText())
+            
+            # Get the lambda body expression
+            body_expr = None
+            for i in range(lambda_expr.getChildCount()):
+                child = lambda_expr.getChild(i)
+                if isinstance(child, OnionParser.ExpressionContext):
+                    body_expr = child
+                    break
+            
+            if not body_expr or not params:
+                raise OnionRuntimeError("Invalid lambda expression in filter")
+            
+            # Process each list item with the lambda
+            for item in lst:
+                # Push a new scope for this lambda execution
+                self.env.push_scope()
+                try:
+                    # Define the parameter with the current list item
+                    self.env.define(params[0], item)
+                    
+                    # Evaluate the lambda body in this scope to get boolean result
+                    predicate_result = self.visit(body_expr)
+                    if predicate_result:  # Filter in only items that evaluate to true
+                        result.append(item)
+                finally:
+                    # Pop scope after processing this item
+                    self.env.pop_scope()
+            
+            return result
+        else:
+            # Regular function reference
+            predicate = self.visit(pred_expr)
+            
+            # Check if predicate is a Lambda
+            if isinstance(predicate, Lambda):
+                # Apply predicate to each list element
+                result = []
+                for item in lst:
+                    # Call the lambda with the current interpreter
+                    if predicate([item], self):
+                        result.append(item)
+                return result
+            else:
+                raise OnionTypeError("Filter predicate must be a lambda expression")
+    
+    def visitReduceExpr(self, ctx):
+        """Handle reduce expression: (reduce op list)"""
+        # Get the operator
+        op_text = None
+        for i in range(ctx.getChildCount()):
+            child = ctx.getChild(i)
+            if hasattr(child, 'getText') and child.getText() in ['+', '-', '*', '//']:
+                op_text = child.getText()
+                break
+                
+        if op_text is None:
+            raise OnionRuntimeError("Reduce requires an operator (+, -, *, //)")
+            
+        # Get the list expression
+        list_expr = None
+        for i in range(ctx.getChildCount()):
+            child = ctx.getChild(i)
+            if isinstance(child, OnionParser.ExpressionContext):
+                list_expr = child
+                break
+                
+        if list_expr is None:
+            raise OnionRuntimeError("Reduce requires a list expression")
+            
+        # Get the list value
+        lst = self.visit(list_expr)
+        
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Reduce requires a list, got {type(lst).__name__}")
+            
+        if not lst:
+            raise OnionRuntimeError("Cannot reduce an empty list")
+            
+        # Apply the operation cumulatively
+        result = lst[0]
+        for item in lst[1:]:
+            if op_text == '+':
+                result = result + item
+            elif op_text == '-':
+                result = result - item
+            elif op_text == '*':
+                result = result * item
+            elif op_text == '//':
+                if item == 0:
+                    raise OnionDivisionByZeroError("Division by zero in reduce operation")
+                result = result // item
+                
+        return result
+        
+    def visitMapExpr(self, ctx):
+        """Handle map expression: (map function list)"""
+        expressions = ctx.expression()
+        
+        if len(expressions) != 2:
+            raise OnionArgumentError("Map requires exactly 2 expressions: function and list")
+        
+        # Get the function expression and list expression
+        func_expr = expressions[0]
+        list_expr = expressions[1]
+        
+        # Evaluate the list expression
+        lst = self.visit(list_expr)
+        
+        if not isinstance(lst, list):
+            raise OnionTypeError(f"Second argument of map must be a list, got {type(lst).__name__}")
+        
+        # Handle direct lambda expression
+        if isinstance(func_expr, OnionParser.ExpressionContext) and func_expr.compoundExpr() and \
+           func_expr.compoundExpr().lambdaExpr():
+            # This is a lambda expression directly in the map call
+            lambda_expr = func_expr.compoundExpr().lambdaExpr()
+            result = []
+            
+            # Get lambda parameters (we need them for each list item)
+            params = []
+            for i in range(lambda_expr.getChildCount()):
+                if i > 0:  # Skip 'lambda' token
+                    child = lambda_expr.getChild(i)
+                    if isinstance(child, OnionParser.ExpressionContext):
+                        break
+                    elif hasattr(child, 'symbol') and child.symbol.type == OnionParser.IDENTIFIER:
+                        params.append(child.getText())
+            
+            # Get the lambda body expression
+            body_expr = None
+            for i in range(lambda_expr.getChildCount()):
+                child = lambda_expr.getChild(i)
+                if isinstance(child, OnionParser.ExpressionContext):
+                    body_expr = child
+                    break
+            
+            if not body_expr or not params:
+                raise OnionRuntimeError("Invalid lambda expression in map")
+            
+            # Process each list item with the lambda
+            for item in lst:
+                # Push a new scope for this lambda execution
+                self.env.push_scope()
+                try:
+                    # Define the parameter with the current list item
+                    self.env.define(params[0], item)
+                    
+                    # Evaluate the lambda body in this scope
+                    mapped_val = self.visit(body_expr)
+                    result.append(mapped_val)
+                finally:
+                    # Pop scope after processing this item
+                    self.env.pop_scope()
+            
+            return result
+        else:
+            # Regular function reference
+            func = self.visit(func_expr)
+            
+            # Check if func is a Lambda
+            if isinstance(func, Lambda):
+                # Apply function to each list element
+                result = []
+                for item in lst:
+                    # Call the lambda with the current interpreter
+                    mapped_val = func([item], self)
+                    result.append(mapped_val)
+                return result
+            else:
+                raise OnionTypeError("Map function must be a lambda expression")
+
 
 class ConditionalVisitor(BaseInterpreter):
-    def visitIfExpr(self, ctx):
-        return self._handle_conditional(
-            ctx.expression(), ctx.statement(), construct="if"
-        )
+    def visitIfExpr(self, ctx: OnionParser.IfExprContext):
+        if_condition_expr = ctx.expression(0)
+        if_condition_value = self.visit(if_condition_expr)
+        self._assert_bool(if_condition_value, "if")
 
-    def visitBranchExpr(self, ctx):
-        return self._handle_conditional(
-            ctx.expression(), ctx.statement(), construct="branch"
-        )
+        current_child_index = 0
+        for i in range(ctx.getChildCount()):
+            if ctx.getChild(i) == if_condition_expr:
+                current_child_index = i + 1
+                break
+        
+        if_statements = []
+        temp_idx_for_if_stmts = current_child_index
+        while temp_idx_for_if_stmts < ctx.getChildCount():
+            child = ctx.getChild(temp_idx_for_if_stmts)
+            if isinstance(child, OnionParser.StatementContext):
+                if_statements.append(child)
+            elif isinstance(child, TerminalNode) and child.getText() == '(':
+                break 
+            temp_idx_for_if_stmts += 1
+        current_child_index = temp_idx_for_if_stmts
 
-    def _handle_conditional(self, expr_list, stmt_list, construct):
-        num_conds = len(expr_list)
-        num_stmts = len(stmt_list)
+        if if_condition_value:
+            result = None
+            for stmt_ctx in if_statements:
+                result = self.visit(stmt_ctx)
+                if isinstance(result, ReturnValue):
+                    return result
+            return result
 
-        # Evaluate each condition in order
-        for i, expr_ctx in enumerate(expr_list):
-            cond_value = self.visit(expr_ctx)
-            self._assert_bool(cond_value, construct)
-            if cond_value:
-                return self.visit(stmt_list[i])
+        elif_expression_index_offset = 1
+        
+        processed_elif_or_else = False
+        while current_child_index < ctx.getChildCount():
+            child = ctx.getChild(current_child_index)
+            if isinstance(child, TerminalNode) and child.getText() == '(':
+                next_node_idx = current_child_index + 1
+                if next_node_idx < ctx.getChildCount():
+                    next_node_terminal = ctx.getChild(next_node_idx)
+                    if isinstance(next_node_terminal, TerminalNode):
+                        # Check for ELIF
+                        if next_node_terminal.getText() == 'elif':
+                            elif_condition_expr = ctx.expression(elif_expression_index_offset)
+                            elif_condition_value = self.visit(elif_condition_expr)
+                            self._assert_bool(elif_condition_value, "elif")
+                            
+                            elif_statements = []
+                            temp_idx = current_child_index + 3 
+                            while temp_idx < ctx.getChildCount():
+                                inner_child = ctx.getChild(temp_idx)
+                                if isinstance(inner_child, OnionParser.StatementContext):
+                                    elif_statements.append(inner_child)
+                                elif isinstance(inner_child, TerminalNode) and inner_child.getText() == ')':
+                                    break
+                                temp_idx += 1
+                            
+                            if elif_condition_value:
+                                result = None
+                                for stmt_ctx in elif_statements:
+                                    result = self.visit(stmt_ctx)
+                                    if isinstance(result, ReturnValue):
+                                        return result
+                                return result
+                               
+                            current_child_index = temp_idx + 1 
+                            elif_expression_index_offset += 1
+                            processed_elif_or_else = True
+                            continue 
 
-        # No condition matched; check for default statement
-        if num_stmts > num_conds:
-            # Default is the last statement
-            return self.visit(stmt_list[-1])
+                        # Check for ELSE
+                        elif next_node_terminal.getText() == 'else':
+                            else_statements = []
+                            temp_idx = current_child_index + 2 
+                            while temp_idx < ctx.getChildCount():
+                                inner_child = ctx.getChild(temp_idx)
+                                if isinstance(inner_child, OnionParser.StatementContext):
+                                    else_statements.append(inner_child)
+                                elif isinstance(inner_child, TerminalNode) and inner_child.getText() == ')':
+                                    break
+                                temp_idx += 1
+                            
+                            result = None
+                            for stmt_ctx in else_statements:
+                                result = self.visit(stmt_ctx)
+                                if isinstance(result, ReturnValue):
+                                    return result
+                            current_child_index = temp_idx + 1 
+                            processed_elif_or_else = True
+                            return result 
+                    break 
+            else:
+                current_child_index += 1
+        
+        return None
 
-        # No branch taken
+    def visitBranchExpr(self, ctx: OnionParser.BranchExprContext):
+        # For cond, each (condition statement) pair is evaluated
+        # cond (expr stmt) (expr stmt) ... (t stmt)?
+        num_pairs = (ctx.getChildCount() -1) // 3 # roughly, for ( expr stmt )
+        
+        current_child_idx = 1 # Skip initial 'cond' or '('
+        
+        while current_child_idx < ctx.getChildCount():
+            node = ctx.getChild(current_child_idx)
+            if isinstance(node, TerminalNode) and node.getText() == '(':
+                # Start of a pair or the 't' clause
+                next_node = ctx.getChild(current_child_idx + 1)
+                if isinstance(next_node, TerminalNode) and next_node.getText() == 't':
+                    # This is the default 't' clause
+                    # ( t statement )
+                    if current_child_idx + 2 < ctx.getChildCount() and isinstance(ctx.getChild(current_child_idx+2), OnionParser.StatementContext):
+                        return self.visit(ctx.getChild(current_child_idx + 2))
+                    else:
+                        break # Malformed 't' clause
+                elif isinstance(next_node, OnionParser.ExpressionContext):
+                    # This is a (condition statement) pair
+                    condition_expr = next_node
+                    statement_node = ctx.getChild(current_child_idx + 2) if current_child_idx + 2 < ctx.getChildCount() else None
+                    
+                    if isinstance(statement_node, OnionParser.StatementContext):
+                        cond_value = self.visit(condition_expr)
+                        self._assert_bool(cond_value, "cond")
+                        if cond_value:
+                            return self.visit(statement_node)
+                        # Move to the end of this pair: ( expr stmt )
+                        current_child_idx += 4 
+                    else:
+                        break # Malformed pair
+                else:
+                    break # Unexpected structure inside 'cond'
+            else:
+                break # Top level of cond should be pairs or 't' clause
         return None
 
     def _assert_bool(self, value, construct):
         if not isinstance(value, bool):
-            raise OnionTypeError(
-                f"Condition in '{construct}' must be boolean, got {type(value).__name__}"
-            )
-
-    def visitTernaryExpr(self, ctx):
-        """Handle ternary expression: (if condition true_expr : false_expr)"""
-        # Children: 'if', condition_expr, true_expr, ':', false_expr
-        condition = self.visit(ctx.expression(0))
-
-        if not isinstance(condition, bool):
-            raise OnionTypeError(f"Ternary expression requires a boolean condition, got {type(condition).__name__}")
-
-        if condition:
-            return self.visit(ctx.expression(1)) # Evaluate true expression
-        else:
-            return self.visit(ctx.expression(2)) # Evaluate false expression
+            raise OnionTypeError(f"{construct} condition must be boolean, got {type(value).__name__}")
 
 
 class LoopVisitor(BaseInterpreter):
@@ -714,7 +1458,7 @@ class LoopVisitor(BaseInterpreter):
         loop_type = ctx.getChild(0).getText()
         handlers = {
             "repeat": self._handle_repeat,
-            "loop": self._handle_for_loop,
+            "for": self._handle_for_loop,
             "while": self._handle_while,
         }
         if loop_type not in handlers:
@@ -728,35 +1472,77 @@ class LoopVisitor(BaseInterpreter):
         if count < 0:
             raise OnionRuntimeError("Repeat count cannot be negative")
 
-        block_node = ctx.getChild(2) if ctx.getChildCount() > 2 else None
-        return self._iterate_block(block_node, range(count))
+        statements = self._get_loop_statements(ctx)
+        
+        result = None
+        for _ in range(count):
+            self.check_timeout() # Check timeout at the start of each iteration
+
+            vars_in_scope_before_body = set(self.env.scopes[-1].keys())
+            returned_from_iteration = False
+            iteration_body_result = None
+
+            try:
+                for stmt in statements:
+                    stmt_result = self.visit(stmt)
+                    if isinstance(stmt_result, ReturnValue):
+                        returned_from_iteration = True
+                        result = stmt_result # Store ReturnValue to be propagated
+                        break # Exit statements loop for this iteration
+                    iteration_body_result = stmt_result
+                
+                if not returned_from_iteration:
+                    result = iteration_body_result # Update overall loop result if iteration completed normally
+            finally:
+                # Clean up variables declared during this iteration
+                vars_in_scope_after_body = set(self.env.scopes[-1].keys())
+                newly_declared_in_body = vars_in_scope_after_body - vars_in_scope_before_body
+                for var_to_remove in newly_declared_in_body:
+                    if var_to_remove in self.env.scopes[-1]: # Ensure key exists before deleting
+                        del self.env.scopes[-1][var_to_remove]
+            
+            if returned_from_iteration:
+                return result # Propagate ReturnValue immediately
+
+        return result
 
     def _handle_for_loop(self, ctx):
-        var_name = ctx.IDENTIFIER().getText()
-
-        # Handle different numbers of arguments for range()
+        # Get variable name or underscore (for anonymous iterator)
+        var_node = ctx.getChild(2)
+        if isinstance(var_node, TerminalNode):
+            var_name = var_node.getText()
+            if var_name == "_":
+                # Anonymous iterator - we'll still need a variable name in the environment
+                var_name = "_for_loop_anonymous_" + str(id(ctx))
+        else:
+            # This should be caught by the parser, but just in case
+            raise OnionRuntimeError("Expected identifier or underscore in for loop")
+        
+        # Get expressions
         expressions = ctx.expression()
-        num_args = len(expressions)
-
-        if num_args == 1:
-            # range(end)
-            start = 0
-            end = self.visit(expressions[0])
-            step = 1
-        elif num_args == 2:
-            # range(start, end)
-            start = self.visit(expressions[0])
-            end = self.visit(expressions[1])
-            step = 1
-        elif num_args == 3:
-            # range(start, end, step)
+        
+        # Handle the different cases of the for loop syntax
+        # for (id/_ start:end step)
+        if len(expressions) == 3:
+            # All arguments provided: start, end, step
             start = self.visit(expressions[0])
             end = self.visit(expressions[1])
             step = self.visit(expressions[2])
+        elif len(expressions) == 2:
+            # Start and end provided, default step=1
+            start = self.visit(expressions[0])
+            end = self.visit(expressions[1])
+            step = 1
+        elif len(expressions) == 1:
+            # Only end provided, default start=0, step=1
+            start = 0
+            end = self.visit(expressions[0])
+            step = 1
         else:
-            # This case should ideally be caught by the parser based on the grammar
-            raise OnionArgumentError(f"range() expects 1, 2, or 3 arguments, got {num_args}")
+            # This should be caught by the parser, but just in case
+            raise OnionArgumentError(f"For loop expects 1-3 expressions, got {len(expressions)}")
 
+        # Validate numeric arguments
         for val, name in ((start, "start"), (end, "end"), (step, "step")):
             if not isinstance(val, int):
                 raise OnionTypeError(f"Loop {name} must be an integer")
@@ -768,64 +1554,127 @@ class LoopVisitor(BaseInterpreter):
         if (step > 0 and start > end) or (step < 0 and start < end):
             raise OnionLoopRangeError(f"Loop will never execute with range({start}, {end}, {step})")
 
-        block_node = ctx.getChild(ctx.getChildCount() - 1)
+        # Get statements to execute in loop body
+        statements = self._get_loop_statements(ctx)
         seq = range(start, end, step)
 
-        def body():
-            # Safety check for very large ranges
-            if len(seq) > 100000:
-                raise OnionLoopRangeError(f"Range too large: {len(seq)} iterations")
+        # Safety check for very large ranges
+        if len(seq) > 100000:
+            raise OnionLoopRangeError(f"Range too large: {len(seq)} iterations")
                 
-            iteration_count = 0
-            for current in seq:
-                # Check timeout periodically
-                iteration_count += 1
-                if iteration_count % 1000 == 0:
-                    self.check_timeout()
-                    
-                self.env.define(var_name, current)
-                yield self.visit(block_node)
-
-        return self._collect_loop_result(body())
-
-    def _handle_while(self, ctx):
-        cond_ctx = ctx.expression(0)
-        block_node = ctx.getChild(2) if ctx.getChildCount() > 2 else None
-
-        def body():
-            iterations = 0
-            while True:
-                self.check_timeout()  # Check timeout on each iteration
-                
-                # Add a safeguard for very tight loops
-                iterations += 1
-                if iterations % 1000 == 0:  # Check every 1000 iterations
-                    self.check_timeout()
-                    
-                cond = self.visit(cond_ctx)
-                if not isinstance(cond, bool):
-                    raise OnionTypeError("While condition must be boolean")
-                if not cond:
-                    break
-                yield self.visit(block_node)
-
-        return self._collect_loop_result(body())
-
-    def _iterate_block(self, block_node, iterator):
+        # Execute the loop
         result = None
-        for _ in iterator:
-            result = self.visit(block_node)
-            if isinstance(result, ReturnValue):
-                return result
+        iteration_count = 0
+        for current in seq:
+            # Check timeout periodically
+            iteration_count += 1
+            if iteration_count % 1000 == 0: # Existing check
+                    self.check_timeout()
+                    
+            self.env.define(var_name, current) # Define/update loop variable
+
+            vars_in_scope_before_body = set(self.env.scopes[-1].keys())
+            returned_from_iteration = False
+            iteration_body_result = None
+
+            try:
+                for stmt in statements:
+                    stmt_result = self.visit(stmt)
+                    if isinstance(stmt_result, ReturnValue):
+                        returned_from_iteration = True
+                        result = stmt_result # Store ReturnValue
+                        break # Exit statements loop
+                    iteration_body_result = stmt_result
+                
+                if not returned_from_iteration:
+                    result = iteration_body_result # Update loop's overall result
+            finally:
+                # Clean up variables declared during this iteration's body
+                vars_in_scope_after_body = set(self.env.scopes[-1].keys())
+                newly_declared_in_body = vars_in_scope_after_body - vars_in_scope_before_body
+                for var_to_remove in newly_declared_in_body:
+                    # The loop variable 'var_name' will be in vars_in_scope_before_body,
+                    # so it won't be removed unless re-declared with 'let' inside the body.
+                    if var_to_remove in self.env.scopes[-1]:
+                        del self.env.scopes[-1][var_to_remove]
+
+            if returned_from_iteration:
+                return result # Propagate ReturnValue immediately
+        
         return result
 
-    def _collect_loop_result(self, results):
-        last = None
-        for res in results:
-            if isinstance(res, ReturnValue):
-                return res
-            last = res
-        return last
+    def _handle_while(self, ctx):
+        # Get condition expression
+        cond_ctx = ctx.expression(0)
+
+        # Get statements to execute in loop body
+        statements = self._get_loop_statements(ctx)
+        
+        result = None 
+        iterations = 0
+        while True:
+            self.check_timeout() 
+                
+            iterations += 1
+            if iterations % 1000 == 0: 
+                    self.check_timeout()
+                    
+            cond = self.visit(cond_ctx)
+            if not isinstance(cond, bool):
+                raise OnionTypeError("While condition must be boolean")
+            if not cond:
+                break
+            
+            vars_in_scope_before_iteration = set(self.env.scopes[-1].keys())
+            _current_iteration_block_result = None 
+            returned_from_iteration = False
+
+            try:
+                for stmt_node in statements: 
+                    _val_from_stmt = self.visit(stmt_node) 
+                    
+                    if isinstance(_val_from_stmt, ReturnValue):
+                        returned_from_iteration = True
+                        result = _val_from_stmt # Store ReturnValue
+                        break # Exit statements loop for this iteration
+                    
+                    _current_iteration_block_result = _val_from_stmt
+                
+                if not returned_from_iteration:
+                    result = _current_iteration_block_result # Update loop's overall result
+            finally:
+                # Clean up variables declared during this iteration
+                vars_in_scope_after_iteration = set(self.env.scopes[-1].keys())
+                newly_declared_vars = vars_in_scope_after_iteration - vars_in_scope_before_iteration
+                for var_name_to_remove in newly_declared_vars:
+                    if var_name_to_remove in self.env.scopes[-1]:
+                        del self.env.scopes[-1][var_name_to_remove]
+            
+            if returned_from_iteration:
+                return result # Propagate ReturnValue immediately
+        
+        return result
+
+    def _get_loop_statements(self, ctx):
+        """Helper method to extract statements from a loop construct."""
+        statements = []
+        
+        # Find the first expression node (condition/count)
+        condition_idx = -1
+        for i in range(ctx.getChildCount()):
+            if isinstance(ctx.getChild(i), OnionParser.ExpressionContext):
+                condition_idx = i
+                break
+                
+        # Collect all statement nodes that come after the expressions
+        expression_count = len(ctx.expression())
+        start_idx = condition_idx + expression_count
+        
+        for i in range(start_idx, ctx.getChildCount()):
+            if isinstance(ctx.getChild(i), OnionParser.StatementContext):
+                statements.append(ctx.getChild(i))
+                
+        return statements
 
 
 class FunctionVisitor(BaseInterpreter):
@@ -840,23 +1689,67 @@ class FunctionVisitor(BaseInterpreter):
             return None
 
         name = identifiers[0].getText()
-        params = [ident.getText() for ident in identifiers[1:]]
+        
+        # Extract parameter names and types
+        params = []
+        param_types = {}  # Store parameter types for type checking
+        
+        # Find parameter definitions
+        i = 0
+        while i < ctx.getChildCount():
+            child = ctx.getChild(i)
+            
+            # Look for open parenthesis
+            if isinstance(child, TerminalNode) and child.getText() == '(':
+                # Process parameters inside parentheses
+                j = i + 1
+                while j < ctx.getChildCount():
+                    param_child = ctx.getChild(j)
+                    
+                    # Check if we reached the closing parenthesis
+                    if isinstance(param_child, TerminalNode) and param_child.getText() == ')':
+                        i = j  # Skip to the closing parenthesis
+                        break
+                        
+                    # Process parameter identifier
+                    if isinstance(param_child, TerminalNode) and param_child.symbol.type == OnionParser.IDENTIFIER:
+                        param_name = param_child.getText()
+                        params.append(param_name)
+                        
+                        # Check for type declaration after parameter
+                        if j + 1 < ctx.getChildCount() and isinstance(ctx.getChild(j + 1), OnionParser.TypeDecContext):
+                            type_dec = ctx.getChild(j + 1)
+                            param_type = TypeChecker.get_type_from_typedec(type_dec)
+                            param_types[param_name] = param_type
+                            j += 1  # Skip the type declaration
+                    j += 1
+            i += 1
+        
+        # Check for return type declaration
+        # This would be after the parameter list and before the function body
+        return_type = None  # Store return type
+        
+        # Look for return type after closing parenthesis
+        for i in range(ctx.getChildCount()):
+            if isinstance(ctx.getChild(i), TerminalNode) and ctx.getChild(i).getText() == ')':
+                if i + 1 < ctx.getChildCount() and isinstance(ctx.getChild(i + 1), OnionParser.TypeDecContext):
+                    type_dec = ctx.getChild(i + 1)
+                    return_type = TypeChecker.get_type_from_typedec(type_dec)
+                break
+        
+        # Get the body statements
+        # The body consists of all statements after the function signature
+        statements = []
+        for i in range(ctx.getChildCount()):
+            if isinstance(ctx.getChild(i), OnionParser.StatementContext):
+                statements.append(ctx.getChild(i))
+        
+        # Store function definition with params, types, and body
         self.functions[name] = {
             "params": params,
-            "body": ctx.block()
-        }
-        return None
-
-    def visitMacroDef(self, ctx):
-        identifiers = ctx.IDENTIFIER()
-        if not identifiers:
-            return None
-
-        name = identifiers[0].getText()
-        params = [ident.getText() for ident in identifiers[1:]]
-        self.macros[name] = {
-            "params": params,
-            "body": ctx.block()
+            "param_types": param_types,
+            "return_type": return_type,
+            "body": statements  # Store statements directly instead of a block
         }
         return None
 
@@ -865,8 +1758,6 @@ class FunctionVisitor(BaseInterpreter):
 
         # Evaluate all arguments
         args = self._evaluate_arguments(ctx)
-        if name in self.macros:
-            return self._handle_macro_call(ctx, name, args)
 
         if name in BuiltInFunctions.registry:
             return BuiltInFunctions.execute(name, self, args)
@@ -876,6 +1767,11 @@ class FunctionVisitor(BaseInterpreter):
 
         if name in self.functions:
             return self._handle_function_call(ctx, name, args)
+            
+        # Check if the identifier refers to a Lambda stored in a variable
+        value = self.env.lookup(name)
+        if isinstance(value, Lambda):
+            return value(args, self)  # Call the lambda with the current interpreter
 
         # Function not found
         raise OnionNameError(f"Function '{name}' is not defined")
@@ -915,7 +1811,9 @@ class FunctionVisitor(BaseInterpreter):
         try:
             function_def = self.functions[name]
             params = function_def["params"]
-            body = function_def["body"]
+            statements = function_def["body"]  # Now it's a list of statements
+            param_types = function_def.get("param_types", {})
+            return_type = function_def.get("return_type")
 
             if args is None:
                 args = self._evaluate_arguments(ctx)
@@ -930,73 +1828,46 @@ class FunctionVisitor(BaseInterpreter):
             current_scope = self.env.current_scope()
             # Define parameters directly in the new scope
             for i, param in enumerate(params):
+                # Type check parameter value if type is defined
+                if param in param_types:
+                    expected_type = param_types[param]
+                    if not TypeChecker.check_type(args[i], expected_type):
+                        raise OnionTypeError(f"Parameter '{param}': " + 
+                                           TypeChecker.type_error_message(args[i], expected_type))
+                
                 current_scope[param] = args[i]
 
             final_return_value = None
-            # Execute the function body statement by statement
-            for i in range(body.getChildCount()):
+            # Execute each statement in the function body
+            for stmt in statements:
                 self.check_timeout()  # Check timeout during function execution
-                stmt = body.getChild(i)
-                stmt_result = self.visit(stmt) # This might return a ReturnValue object
+                stmt_result = self.visit(stmt)  # This might return a ReturnValue object
                 
                 if isinstance(stmt_result, ReturnValue):
-                    final_return_value = stmt_result.value # Extract the actual value
-                    break # Exit the loop immediately upon return
+                    final_return_value = stmt_result.value  # Extract the actual value
+                    # Type check return value if return type is defined
+                    if return_type:
+                        if not TypeChecker.check_type(final_return_value, return_type):
+                            raise OnionTypeError(f"Function '{name}' return value: " + 
+                                              TypeChecker.type_error_message(final_return_value, return_type))
+                    break  # Exit the loop immediately upon return
                 elif stmt_result is not None:
                     # If no explicit return, the value of the last statement is used (like Lisp)
                     final_return_value = stmt_result
 
-            # The scope is still present here, after body execution / return detection
+            # Pop scope before type checking final implicit return value
             self.env.pop_scope()
 
-            return final_return_value # Return the determined value
+            # Check type of implicit return (if not already checked by explicit return)
+            if return_type and not isinstance(final_return_value, ReturnValue):
+                if not TypeChecker.check_type(final_return_value, return_type):
+                    raise OnionTypeError(f"Function '{name}' return value: " + 
+                                      TypeChecker.type_error_message(final_return_value, return_type))
+
+            return final_return_value  # Return the determined value
         finally:
             # Remove function from call stack even if an exception occurs
             self.call_stack.pop()
-
-    def _handle_macro_call(self, ctx, macro_name=None, args=None):
-        """Handle execution of a macro"""
-        if macro_name is None:
-            macro_name = ctx.IDENTIFIER().getText()
-
-        macro_def = self.macros[macro_name]
-        params = macro_def["params"]
-        body = macro_def["body"]
-
-        # Use provided args or evaluate them if not provided
-        if args is None:
-            args = self._evaluate_arguments(ctx)
-
-        # Validate argument count
-        if len(args) != len(params):
-            raise OnionArgumentError(
-                f"Macro '{macro_name}' expected {len(params)} arguments, got {len(args)}"
-            )
-
-        # Create a new scope for macro execution
-        self.env.push_scope()
-
-        try:
-            # Define parameters in the new scope
-            for i, param in enumerate(params):
-                self.env.define(param, args[i])
-
-            # Execute the macro body
-            result = None
-            for i in range(body.getChildCount()):
-                stmt = body.getChild(i)
-                stmt_result = self.visit(stmt)
-
-                if isinstance(stmt_result, ReturnValue):
-                    result = stmt_result.value
-                    break
-                elif stmt_result is not None:
-                    result = stmt_result
-
-            return result
-        finally:
-            # Restore previous scope
-            self.env.pop_scope()
 
     def _evaluate_arguments(self, ctx):
         """Evaluate function call arguments"""
@@ -1009,6 +1880,17 @@ class FunctionVisitor(BaseInterpreter):
                 raise OnionRuntimeError(f"Error evaluating argument: {e}")
         return args
 
+    def visitReturnStmt(self, ctx):
+        """Handle return statement and type checking for return values"""
+        if ctx.getChildCount() > 1:
+            expr = ctx.getChild(1)  # Phần tử thứ 2 (index 1) sau 'return'
+            value = self.visit(expr)  # Triggers lookup if expr is identifier
+            
+            # Note: Type checking for return values is done in _handle_function_call
+            # because that's where we have access to the function's return type
+            return ReturnValue(value)
+        return ReturnValue(None)
+
 class Interpreter(
     # BaseInterpreter is inherited via other visitors
     ArithmeticVisitor,  # Inherits ExpressionVisitor -> BaseInterpreter
@@ -1018,7 +1900,7 @@ class Interpreter(
     LoopVisitor,        # Inherits BaseInterpreter
     FunctionVisitor     # Inherits BaseInterpreter
 ):
-    def __init__(self, max_execution_time=300.0, max_recursion_depth=1000):
+    def __init__(self, max_execution_time=300.0, max_recursion_depth=1000, is_repl_mode=True):
         # Ensure super().__init__() calls the correct chain
         super().__init__()
         # Initialize environment and built-ins specifically for Interpreter instance
@@ -1028,6 +1910,7 @@ class Interpreter(
         self.max_execution_time = max_execution_time  # Set configurable execution time limit (300 seconds = 5 minutes)
         self.start_time = time.time()  # Reset timer at initialization
         self.visit_count = 0  # Counter to avoid checking timeout too frequently
+        self.is_repl_mode = is_repl_mode  # Flag to indicate if we're running in REPL mode
         BuiltInFunctions.register_defaults()
         
     def visit(self, tree):

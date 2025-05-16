@@ -1,10 +1,25 @@
-#(def add5(x)
-#    (+ 5 x)
-#)
+(println "Starting x=1, l=[1,2,3]")
+(let (x 1) (l (list 1 2 3)))
 
+(if (== x 1)
+    (append l 1)
+    ((+= x 1))
+    (println "x was 1, appended 1 to l, incremented x.")
 
-(def foo(n)
-    (print n)
+    (elif (== x 2)  # This will be evaluated if the first (== x 1) was false OR if x became 2
+        (append l 2)
+        ((+= x 1))
+        (println "x was 2, appended 2 to l, incremented x.")
+    )
+
+    (else
+        (print "x was not 1 initially, and did not become 2 after first block.")
+        (println " (current x value for else: ") (print x) (println ")")
+    )
 )
-#(main)
-(print (foo 3))
+
+(println "After if-elif-else block:")
+(println "List l is now:")
+(println l)
+(println "x is now:")
+(println x)

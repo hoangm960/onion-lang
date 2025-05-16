@@ -12,26 +12,43 @@ statementType:
 	assignment
 	| expression
 	| printStatement
-	| macroDef
-	| classDef
 	| loopStatement
-	| incDecStmt
+	| augmentedAssignment
 	| functionDef
 	| returnStmt
-	| block
 	| ifExpr
 	| branchExpr
-	| appendStmt;
+	| appendStmt
+	| setStmt;
 
-incDecStmt:
-	'inc' IDENTIFIER // Increment: (inc x)
-	| 'dec' IDENTIFIER; // Decrement: (dec x)
+augmentedAssignment:
+	'+=' IDENTIFIER expression
+	|'-=' IDENTIFIER expression
+	|'*=' IDENTIFIER expression
+	|'/=' IDENTIFIER expression
+	;
 
 assignment:
-	'let' IDENTIFIER (expression | ternaryExpr)
-	| 'let' ( '(' IDENTIFIER (expression | ternaryExpr) ')')+;
+	'let' IDENTIFIER (typeDec)? (expression | ternaryExpr)
+	| 'let' ( '(' IDENTIFIER (typeDec)? (expression | ternaryExpr) ')')+ //Multi assignment
+	;
+
+setStmt:
+	'set' IDENTIFIER (expression | ternaryExpr);
 
 expression: literal | IDENTIFIER | '(' compoundExpr ')';
+
+type: 
+	'int'
+	| 'char'
+	| 'string'
+	| 'bool'
+	| 'float'
+	| 'list'
+	| 'void'
+	;
+
+typeDec: ':' type;
 
 compoundExpr:
     arithmeticExpr # Arithmetic
@@ -43,6 +60,10 @@ compoundExpr:
   | branchExpr # Branch
   | ternaryExpr # Ternary
   | listOpExpr # ListOp
+  | lambdaExpr # Lambda
+  | filterExpr # Filter
+  | reduceExpr # Reduce
+  | mapExpr # Map
 ;
 
 arithmeticExpr:
@@ -50,7 +71,8 @@ arithmeticExpr:
 	| '-' expression expression
 	| '*' expression+
 	| '/' expression expression
-	| '//' expression expression;
+	| '//' expression expression
+	| '%' expression expression;
 
 booleanExpr:
 	'==' expression expression
@@ -66,12 +88,18 @@ logicalExpr:
 	| '|' expression expression  // Logical OR
 	| '!' expression;            // Logical NOT
 
-listExpr: 'list' expression*; // Allow empty lists (list)
+listExpr: 'list' (typeDec)? expression*; // Allow empty lists (list)
+
+lambdaExpr: 'lambda' (IDENTIFIER)+ expression; // (lambda x (*x 2))
+
+filterExpr: 'filter' expression expression; //(filter (even x) list)
+
+reduceExpr: 'reduce' ('+' | '-' | '*' | '//') expression; //('reduce' + list)
 
 ifExpr:
-	'if' expression statement (
-		'(' 'elif' expression statement ')'
-	)* ('(' 'else' statement ')')?;
+	'if' expression (statement)+ (
+		'(' 'elif' expression (statement)+ ')'
+	)* ('(' 'else' (statement)+ ')')?;
 
 branchExpr:
 	'cond' ('(' expression statement ')')+ (
@@ -79,20 +107,22 @@ branchExpr:
 	)?;
 
 functionDef:
-	'def' IDENTIFIER '(' (IDENTIFIER)* ')' // Simplified parameter list - allows zero params
-	block;
+	'def' IDENTIFIER '(' (IDENTIFIER (typeDec)?)* ')' (typeDec)?
+	(statement)+;
 
 returnStmt: 'return' expression;
 
 callExpr:
 	IDENTIFIER expression*; // Simplified argument list - allows zero args
 
-printStatement: 'print' expression;
+printStatement: 
+	'print' expression
+	|'println' expression;
 
 loopStatement:
-	'repeat' expression block
-	| 'loop' IDENTIFIER 'range' '(' expression (expression)? (expression)? ')' block
-	| 'while' expression block;
+	'repeat' expression (statement)+
+	| 'for' '(' (IDENTIFIER | '_') (expression)':'(expression) (expression)?')' (statement)+ //for (id start:end step)
+	| 'while' expression (statement)+;
 
 listOpExpr:
 	'head' expression
@@ -100,20 +130,10 @@ listOpExpr:
 	| 'id' expression expression //getid index list
 	| 'len' expression;
 
-// Macros look syntactically similar to functions - ensure distinct handling in visitor/listener
-macroDef:
-	'macro' IDENTIFIER '(' (IDENTIFIER)* ')' block; // Simplified params
-
-classDef: 'class' IDENTIFIER classBody;
-
-classBody: '(' methodDef+ ')';
-
-methodDef:
-	'def' IDENTIFIER '(' IDENTIFIER* ')' block; // Simplified params
-
-block: statement+;
 
 appendStmt: 'append' IDENTIFIER expression;
+
+mapExpr: 'map' expression expression; // (map (lambda x (*x 2)) list)
 
 literal: INT | FLOAT | BOOL | STRING | FSTRING;
 
