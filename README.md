@@ -1,4 +1,9 @@
 # Onion
+
+🧅 Welcome to Onion! 🧅
+
+Onion is a delightful little programming language designed to be both powerful and fun to use. It draws inspiration from the elegance of Lisp (you'll notice the parentheses! 😉) but aims for a syntax that feels as approachable and easy to learn as Python. Whether you're a seasoned Lisp enthusiast or new to functional programming concepts, Onion offers a fresh and engaging experience. Dive in and explore its features! 🚀
+
 ## Objective
 - Document writing
 - Language features
@@ -91,179 +96,111 @@ Here are some of the key features of the Onion language with examples:
 ### 1. Variables and Assignment
 Variables are declared using `let`. Type declarations are optional.
 ```onion
-# Basic assignment
 (let x 10)
 (let name "Onion")
-
-# Assignment with optional type declaration
-(let count:int 100)
-(let pi:float 3.14159)
-(let items:list (list 1 2 3))
-
-# Multiple assignments in one statement
-(let (a 1) (b "hello") (c:bool true))
-
-# Re-assigning an existing variable (must be declared with 'let' first)
-(set x 20) 
+(let count:int 100) # With type
+(let (a 1) (b "hello")) # Multiple
+(set x 20) # Re-assign
 ```
 
 ### 2. Conditional Statements (if/elif/else)
-Onion supports `if`, `elif`, and `else` for conditional logic.
+Onion supports `if`, `elif`, and `else`.
 ```onion
-(let score 85)
-
+(let score 75)
 (if (>= score 90)
     (print "Grade: A")
     (elif (>= score 80)
         (print "Grade: B"))
-    (elif (>= score 70)
-        (print "Grade: C"))
     (else
-        (print "Grade: D or F"))
-)
-
-# Conditional without else
-(if (< score 0)
-    (print "Invalid score!")
+        (print "Grade: C or lower"))
 )
 ```
 
 ### 3. Lists
-Lists are ordered collections of items. Type declarations for list elements are optional.
-
+Lists are ordered collections. Type declarations for list elements are optional.
 ```onion
 # Creating lists
-(let empty_list (list))
-(let numbers (list 1 2 3 4 5))
-(let mixed_list (list 1 "two" true 3.0))
-(let typed_list (list:int (list 10 20 30))) # A list specifically of integers
+(let numbers (list 1 2 3))
+(let typed_list (list:int (list 10 20))) # Typed list
 
 # Get list length
 (let my_list (list "a" "b" "c"))
 (print (len my_list)) # Output: 3
 
 # Get element by index (0-based)
-(print (id 0 my_list)) # Output: "a"
-(print (id 2 my_list)) # Output: "c"
+(print (id 1 my_list)) # Output: "b"
 
-# Append element to a list (modifies the list in-place)
+# Append element (modifies in-place)
 (append my_list "d")
 (print my_list) # Output: (list "a" "b" "c" "d")
 ```
 
 #### List Operations: `map`, `lambda`, `reduce`, `filter`
-
 ```onion
-(let data (list 1 2 3 4 5))
+(let data (list 1 2 3 4))
 
-# Lambda functions (anonymous functions)
-# (lambda (parameters) body_expression)
-(let square (lambda (x) (* x x)))
-(print (square 5)) # Output: 25
+# Lambda: (lambda (params) body_expr)
+(let double (lambda (x) (* x x)))
+(print (double 3)) # Output: 9
 
-# Map: Apply a function to each element of a list
-# (map function_or_lambda list)
-(let squared_data (map (lambda (n) (* n n)) data))
-(print squared_data) # Output: (list 1 4 9 16 25)
+# Map: (map fn list)
+(let doubled_data (map double data))
+(print doubled_data) # Output: (list 1 4 9 16)
 
-(let add_ten (lambda (x) (+ x 10)))
-(let mapped_data (map add_ten data))
-(print mapped_data) # Output: (list 11 12 13 14 15)
+# Filter: (filter predicate_lambda list)
+(let evens (filter (lambda (n) (== (% n 2) 0)) data))
+(print evens) # Output: (list 2 4)
 
-# Filter: Create a new list with elements that satisfy a condition
-# (filter predicate_lambda list)
-(let even_numbers (filter (lambda (n) (== (% n 2) 0)) data))
-(print even_numbers) # Output: (list 2 4)
-
-# Reduce: Apply a function cumulatively to the items of a list
-# (reduce operator list) where operator is '+', '-', '*', '/'
-(let sum_of_data (reduce + data))
-(print sum_of_data) # Output: 15
-
-(let product_of_data (reduce * data))
-(print product_of_data) # Output: 120
+# Reduce: (reduce operator list)
+(let sum_val (reduce + data))
+(print sum_val) # Output: 10
 ```
 
 ### 4. Loops
 
 #### `for` loop
-Iterates over a range with a specified step.
-`_` can be used if the loop variable is not needed.
+`(for (var start:end step) statements+)`
 ```onion
-# (for (variable start_inclusive:end_exclusive step) statements+)
-(for (i 0:5 1) 
-    (print i)
-)
-
-(for (x 10:0 -2)
-    (print x)
-)
+(for (i 0:3 1) (print i)) # Prints 0, 1, 2
 ```
 
 #### `while` loop
-Executes statements as long as a condition is true.
 ```onion
 (let counter 0)
-(while (< counter 3)
+(while (< counter 2)
     (print counter)
-    (set counter (+ counter 1)) 
-    # Prints 0, 1, 2
+    (set counter (+ counter 1)) # Prints 0, 1
 )
 ```
 
 #### `repeat` loop
-Executes statements a fixed number of times.
 ```onion
-(repeat 3 
-    (println "Hello from repeat!") 
-    # Prints "Hello from repeat!" 3 times
-)
+(repeat 2 (println "Hi")) # Prints "Hi" twice
 ```
 
 ### 5. Functions
-Functions are defined using `def`. Parameter and return type declarations are optional.
-
+Defined with `def`. Types are optional.
 ```onion
-# Simple function
-(def greet (name)
-    (println (+ "Hello, " name "!"))
-)
-(greet "World")
+# Simple function with return
+(def add (a b) (return (+ a b)))
+(print (add 5 3)) # Output: 8
 
-# Function with a return value
-(def add (a b)
-    (return (+ a b))
-)
-(let result (add 5 3))
-(print result) # Output: 8
-
-# Function with type declarations (optional)
-(def multiply (x:int y:int) :int
-    (return (* x y))
-)
+# Typed function
+(def multiply (x:int y:int) :int (return (* x y)))
 (print (multiply 6 7)) # Output: 42
 
-# Fibonacci sequence example
+# Recursive Fibonacci (compact)
 (def fib (n:int) :int
-    (if (<= n 1)
-        (return n)
-        (return (+ (fib (- n 1)) (fib (- n 2))))
-    )
+    (if (<= n 1) (return n) (return (+ (fib (- n 1)) (fib (- n 2)))))
 )
-
-(println "Fibonacci sequence:")
-(for (i 0:10 1)
-    (print "fib(") (print i) (print "): ") (println (fib i))
-)
+(print (fib 5)) # Output: 5
+```
 
 ### 6. Printing
-`print` outputs its argument. `println` outputs its argument followed by a newline.
+`print` and `println` (with newline).
 ```onion
-(print "Hello, ")
-(println "Onion!") 
-# Output: 
-Hello, 
-Onion! (newline after Onion!)
+(print "One ") (println "Two") # Output: One Two (newline)
+```
 
 ## Using the REPL (Read-Evaluate-Print Loop)
 
