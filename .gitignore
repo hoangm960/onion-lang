@@ -6,3 +6,5 @@ generated/*
 !generated/__init__.py
 tests/
 build/
+dist/
+Onion.spec

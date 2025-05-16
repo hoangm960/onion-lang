@@ -46,7 +46,32 @@ Onion is a delightful little programming language designed to be both powerful a
 ├── requirements.txt
 └── test.py              # (Assuming this is a test runner or utility)
 ```
+### Running Tests
+The test files should be placed in the `tests/input/` directory.
 
+To run a specific test file (e.g., `my_test.onion`):
+```bash
+# Using the executable (if dist is in PATH)
+Onion.exe run tests/input/my_test.onion
+
+# Or using Python
+python main.py run tests/input/my_test.onion
+```
+The `run` command in `main.py` can also accept an `--ast` flag to save the AST for each file to `tests/output/`.
+
+```bash
+python main.py run tests/input/my_test.onion --ast
+```
+## Regenerating the Parser
+The grammar file is located at: `grammar/Onion.g4`. After making changes, regenerate the parser files (located in `generated/`):
+```bash
+antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
+```
+## Packaging
+To package the application run:
+```bash
+pyinstaller --onefile main.py -n onion
+```
 ## Running Onion
 
 There are two main ways to run Onion programs or the REPL:
@@ -65,29 +90,6 @@ There are two main ways to run Onion programs or the REPL:
     python main.py repl          # To start the REPL
     python main.py run your_file.onion # To run a file
     ```
-
-### Running Tests
-The test files should be placed in the `tests/input/` directory.
-
-To run a specific test file (e.g., `my_test.onion`):
-```bash
-# Using the executable (if dist is in PATH)
-Onion.exe run tests/input/my_test.onion
-
-# Or using Python
-python main.py run tests/input/my_test.onion
-```
-The `run` command in `main.py` can also accept an `--ast` flag to save the AST for each file to `tests/output/`.
-
-```bash
-python main.py run tests/input/my_test.onion --ast
-```
-
-## Regenerating the Parser
-The grammar file is located at: `grammar/Onion.g4`. After making changes, regenerate the parser files (located in `generated/`):
-```bash
-antlr4 -Dlanguage=Python3 grammar/Onion.g4 -visitor -o generated
-```
 
 ## Onion Language Features
 
